@@ -64,9 +64,9 @@ export default function ActionPanel() {
       <div className="p-4 border-b border-border">
         <div className="flex items-center gap-2">
           <div className={`w-3 h-3 rounded-full bg-player-${currentPlayerIndex + 1}`} />
-          <span className="text-sm font-semibold text-foreground">{pName}</span>
+          <span className="text-base font-semibold text-foreground">{pName}</span>
         </div>
-        <p className="text-xs text-muted-foreground mt-1">
+        <p className="text-sm text-muted-foreground mt-1">
           {phase === 'REINFORCE' && `Place ${reinforcementsLeft} reinforcements on your territories.`}
           {phase === 'ATTACK' && 'Select a territory to attack from, then a target.'}
           {phase === 'FORTIFY' && 'Move armies between two adjacent territories, or skip.'}
@@ -231,10 +231,10 @@ export default function ActionPanel() {
 
       {/* Game Log */}
       <div className="border-t border-border p-3 max-h-48 overflow-y-auto">
-        <span className="text-xs text-muted-foreground font-semibold mb-2 block">COMMAND LOG</span>
-        <div className="space-y-0.5">
+        <span className="text-sm text-muted-foreground font-semibold mb-2 block">COMMAND LOG</span>
+        <div className="space-y-1">
           {log.slice(0, 20).map((entry, i) => (
-            <p key={i} className="text-xs text-muted-foreground leading-tight">{entry.message}</p>
+            <p key={i} className="text-sm text-foreground/70 leading-snug">{entry.message}</p>
           ))}
         </div>
       </div>
