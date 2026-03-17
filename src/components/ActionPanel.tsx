@@ -66,7 +66,7 @@ export default function ActionPanel() {
           <div className={`w-3 h-3 rounded-full bg-player-${currentPlayerIndex + 1}`} />
           <span className="text-sm font-semibold text-foreground">{pName}</span>
         </div>
-        <p className="text-xs text-muted-foreground mt-1">
+        <p className="text-sm text-muted-foreground mt-1">
           {phase === 'REINFORCE' && `Place ${reinforcementsLeft} reinforcements on your territories.`}
           {phase === 'ATTACK' && 'Select a territory to attack from, then a target.'}
           {phase === 'FORTIFY' && 'Move armies between two adjacent territories, or skip.'}
