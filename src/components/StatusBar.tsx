@@ -45,7 +45,9 @@ export default function StatusBar() {
           i === currentPlayerIndex ? 'bg-secondary shadow-surface' : ''
         } ${p.eliminated ? 'opacity-30' : ''}`}>
           <div className={`w-2.5 h-2.5 rounded-full ${PLAYER_BG[i]}`} />
-          <span className="text-xs text-muted-foreground hidden lg:inline">{p.name.split(' ')[0]}</span>
+          <span className="text-xs text-muted-foreground hidden lg:inline">
+            {p.isAI ? '🤖' : ''}{p.name.split(' ')[0]}
+          </span>
           <span className="font-mono-tabular text-xs text-foreground">{playerTerritories(i)}</span>
           <span className="text-muted-foreground text-xs">/</span>
           <span className="font-mono-tabular text-xs text-foreground">{playerArmies(i)}</span>
