@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useGameStore } from '../game/store';
 import { PLAYER_NAMES } from '../game/types';
 import { TERRITORY_MAP } from '../game/mapData';
-import { Swords, Shield, Move, ChevronRight, Dices } from 'lucide-react';
+import { Swords, Shield, Move, ChevronRight, Dices, Target } from 'lucide-react';
 
 function DiceDisplay({ rolls, label, color }: { rolls: number[]; label: string; color: string }) {
   return (
@@ -30,7 +30,7 @@ export default function ActionPanel() {
     phase, currentPlayerIndex, reinforcementsLeft, attackSource, attackTarget,
     fortifySource, fortifyTarget, lastDiceRoll, territories, players, awaitingMoveIn,
     capturedTerritory, endPhase, executeAttack, executeFortify, moveArmiesAfterCapture,
-    tradeInCards, log,
+    tradeInCards, log, missions, useMissions,
   } = useGameStore();
 
   const [moveCount, setMoveCount] = useState(1);
@@ -64,7 +64,9 @@ export default function ActionPanel() {
       <div className="p-4 border-b border-border">
         <div className="flex items-center gap-2">
           <div className={`w-3 h-3 rounded-full bg-player-${currentPlayerIndex + 1}`} />
-          <span className="text-base font-semibold text-foreground">{pName}</span>
+          <span className="text-base font-semibold text-foreground">
+            {player?.isAI ? '🤖 ' : ''}{pName}
+          </span>
         </div>
         <p className="text-sm text-muted-foreground mt-1">
           {phase === 'REINFORCE' && `Place ${reinforcementsLeft} reinforcements on your territories.`}
@@ -72,6 +74,17 @@ export default function ActionPanel() {
           {phase === 'FORTIFY' && 'Move armies between two adjacent territories, or skip.'}
         </p>
       </div>
+
+      {/* Secret Mission */}
+      {useMissions && missions[currentPlayerIndex] && !player?.isAI && (
+        <div className="px-4 py-2 border-b border-border bg-muted/30">
+          <div className="flex items-center gap-1.5 text-primary mb-1">
+            <Target size={12} />
+            <span className="text-xs font-semibold">SECRET MISSION</span>
+          </div>
+          <p className="text-xs text-foreground/80">{missions[currentPlayerIndex].description}</p>
+        </div>
+      )}
 
       {/* Phase actions */}
       <div className="flex-1 p-4 space-y-4 overflow-y-auto">
