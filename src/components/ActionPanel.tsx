@@ -30,7 +30,7 @@ export default function ActionPanel() {
     phase, currentPlayerIndex, reinforcementsLeft, attackSource, attackTarget,
     fortifySource, fortifyTarget, lastDiceRoll, territories, players, awaitingMoveIn,
     capturedTerritory, endPhase, executeAttack, executeFortify, moveArmiesAfterCapture,
-    tradeInCards, log,
+    tradeInCards, log, missions, useMissions,
   } = useGameStore();
 
   const [moveCount, setMoveCount] = useState(1);
