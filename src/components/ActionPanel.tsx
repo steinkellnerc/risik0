@@ -64,7 +64,7 @@ export default function ActionPanel() {
       <div className="p-4 border-b border-border">
         <div className="flex items-center gap-2">
           <div className={`w-3 h-3 rounded-full bg-player-${currentPlayerIndex + 1}`} />
-          <span className="text-sm font-semibold text-foreground">{pName}</span>
+          <span className="text-base font-semibold text-foreground">{pName}</span>
         </div>
         <p className="text-sm text-muted-foreground mt-1">
           {phase === 'REINFORCE' && `Place ${reinforcementsLeft} reinforcements on your territories.`}
