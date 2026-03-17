@@ -75,6 +75,17 @@ export default function ActionPanel() {
         </p>
       </div>
 
+      {/* Secret Mission */}
+      {useMissions && missions[currentPlayerIndex] && !player?.isAI && (
+        <div className="px-4 py-2 border-b border-border bg-muted/30">
+          <div className="flex items-center gap-1.5 text-primary mb-1">
+            <Target size={12} />
+            <span className="text-xs font-semibold">SECRET MISSION</span>
+          </div>
+          <p className="text-xs text-foreground/80">{missions[currentPlayerIndex].description}</p>
+        </div>
+      )}
+
       {/* Phase actions */}
       <div className="flex-1 p-4 space-y-4 overflow-y-auto">
         {/* REINFORCE */}
