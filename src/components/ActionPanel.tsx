@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useGameStore } from '../game/store';
 import { PLAYER_NAMES } from '../game/types';
 import { TERRITORY_MAP } from '../game/mapData';
-import { Swords, Shield, Move, ChevronRight, Dices } from 'lucide-react';
+import { Swords, Shield, Move, ChevronRight, Dices, Target } from 'lucide-react';
 
 function DiceDisplay({ rolls, label, color }: { rolls: number[]; label: string; color: string }) {
   return (
