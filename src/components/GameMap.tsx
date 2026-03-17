@@ -149,12 +149,12 @@ export default function GameMap() {
               />
               {/* Army count */}
               <text x={t.cx} y={t.cy + 1} textAnchor="middle" dominantBaseline="middle"
-                fill={color} fontSize="13" fontFamily="IBM Plex Mono, monospace" fontWeight="600">
+                fill="white" fontSize="15" fontFamily="IBM Plex Mono, monospace" fontWeight="700">
                 {state.armies}
               </text>
               {/* Territory name */}
               <text x={t.cx} y={t.cy + 28} textAnchor="middle" dominantBaseline="middle"
-                fill="hsl(210, 20%, 45%)" fontSize="7" fontFamily="IBM Plex Sans, sans-serif">
+                fill="hsl(210, 20%, 65%)" fontSize="8.5" fontFamily="IBM Plex Sans, sans-serif" fontWeight="500">
                 {t.name}
               </text>
             </g>

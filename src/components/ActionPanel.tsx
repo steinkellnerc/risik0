@@ -231,10 +231,10 @@ export default function ActionPanel() {
 
       {/* Game Log */}
       <div className="border-t border-border p-3 max-h-48 overflow-y-auto">
-        <span className="text-xs text-muted-foreground font-semibold mb-2 block">COMMAND LOG</span>
-        <div className="space-y-0.5">
+        <span className="text-sm text-muted-foreground font-semibold mb-2 block">COMMAND LOG</span>
+        <div className="space-y-1">
           {log.slice(0, 20).map((entry, i) => (
-            <p key={i} className="text-xs text-muted-foreground leading-tight">{entry.message}</p>
+            <p key={i} className="text-sm text-foreground/70 leading-snug">{entry.message}</p>
           ))}
         </div>
       </div>
