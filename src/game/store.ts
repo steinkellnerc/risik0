@@ -1,6 +1,8 @@
 import { create } from 'zustand';
-import { GameState, Phase, Player, TerritoryState, RiskCard, CardType, PLAYER_NAMES, PLAYER_COLORS, getTradeInValue } from './types';
-import { TERRITORIES, CONTINENTS, CONTINENT_MAP } from './mapData';
+import { GameState, Phase, Player, TerritoryState, RiskCard, CardType, Mission, PLAYER_NAMES, PLAYER_COLORS, getTradeInValue } from './types';
+import { TERRITORIES, CONTINENTS } from './mapData';
+import { aiReinforce, aiDecideAttacks, aiFortify } from './ai';
+import { assignMissions, checkMissionComplete } from './missions';
 
 function rollDie(): number {
   return Math.floor(Math.random() * 6) + 1;
@@ -30,8 +32,6 @@ function createDeck(): RiskCard[] {
 function calculateReinforcements(playerIndex: number, territories: Record<string, TerritoryState>): number {
   const owned = Object.entries(territories).filter(([, s]) => s.ownerId === playerIndex);
   let armies = Math.max(3, Math.floor(owned.length / 3));
-
-  // Continent bonuses
   for (const continent of CONTINENTS) {
     if (continent.territories.every(tid => territories[tid]?.ownerId === playerIndex)) {
       armies += continent.bonus;
@@ -45,19 +45,15 @@ function isValidSet(cards: RiskCard[]): boolean {
   const types = cards.map(c => c.type);
   const wilds = types.filter(t => t === 'Wild').length;
   const nonWild = types.filter(t => t !== 'Wild');
-
   if (wilds >= 2) return true;
-  if (wilds === 1) return true; // wild + any 2
-  // All same type
+  if (wilds === 1) return true;
   if (nonWild[0] === nonWild[1] && nonWild[1] === nonWild[2]) return true;
-  // All different
   if (new Set(nonWild).size === 3) return true;
   return false;
 }
 
 export interface GameStore extends GameState {
-  // Actions
-  initGame: () => void;
+  initGame: (humanCount: number, useMissions: boolean) => void;
   placeReinforcement: (territoryId: string) => void;
   tradeInCards: (cardIds: string[]) => void;
   selectAttackSource: (territoryId: string) => void;
@@ -69,6 +65,7 @@ export interface GameStore extends GameState {
   executeFortify: (count: number) => void;
   endPhase: () => void;
   addLog: (message: string) => void;
+  runAITurn: () => void;
   deck: RiskCard[];
   capturedTerritory: string | null;
   awaitingMoveIn: boolean;
@@ -95,28 +92,29 @@ export const useGameStore = create<GameStore>((set, get) => ({
   deck: [],
   capturedTerritory: null,
   awaitingMoveIn: false,
+  missions: {},
+  useMissions: false,
 
   addLog: (message: string) => set(s => ({
     log: [{ timestamp: Date.now(), message }, ...s.log].slice(0, 100),
   })),
 
-  initGame: () => {
+  initGame: (humanCount: number, useMissions: boolean) => {
     const players: Player[] = Array.from({ length: 6 }, (_, i) => ({
       id: i,
       name: PLAYER_NAMES[i],
       color: PLAYER_COLORS[i],
       cards: [],
       eliminated: false,
+      isAI: i >= humanCount,
     }));
 
-    // Randomly assign 42 territories to 6 players (7 each)
     const shuffled = shuffleArray(TERRITORIES.map(t => t.id));
     const territories: Record<string, TerritoryState> = {};
     shuffled.forEach((tid, i) => {
       territories[tid] = { ownerId: i % 6, armies: 1 };
     });
 
-    // Distribute remaining armies (20 - 7 = 13 per player)
     for (let p = 0; p < 6; p++) {
       let remaining = 13;
       const owned = shuffled.filter((_, i) => i % 6 === p);
@@ -127,6 +125,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       }
     }
 
+    const missions = useMissions ? assignMissions(6) : {};
     const reinforcements = calculateReinforcements(0, territories);
 
     set({
@@ -144,13 +143,20 @@ export const useGameStore = create<GameStore>((set, get) => ({
       fortifySource: null,
       fortifyTarget: null,
       lastDiceRoll: null,
-      log: [{ timestamp: Date.now(), message: 'Game started. Red Empire begins.' }],
+      log: [{ timestamp: Date.now(), message: `Game started. ${players[0].isAI ? '🤖 ' : ''}${PLAYER_NAMES[0]} begins.` }],
       winner: null,
       started: true,
       deck: createDeck(),
       capturedTerritory: null,
       awaitingMoveIn: false,
+      missions,
+      useMissions,
     });
+
+    // If first player is AI, run their turn
+    if (players[0].isAI) {
+      setTimeout(() => get().runAITurn(), 500);
+    }
   },
 
   placeReinforcement: (territoryId: string) => {
@@ -181,7 +187,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
       cards: player.cards.filter(c => !cardIds.includes(c.id)),
     };
 
-    // Return cards to deck
     const newDeck = shuffleArray([...s.deck, ...cards]);
 
     set({
@@ -241,13 +246,12 @@ export const useGameStore = create<GameStore>((set, get) => ({
     if (captured) {
       newTerritories[s.attackTarget] = {
         ownerId: s.currentPlayerIndex,
-        armies: 0, // Will be set during move-in
+        armies: 0,
       };
     }
 
     get().addLog(`Attack: ${aRolls.join(',')} vs ${dRolls.join(',')} — Lost A:${aLoss} D:${dLoss}${captured ? ' CAPTURED!' : ''}`);
 
-    // Check for elimination & win
     const defenderId = targetState.ownerId;
     let winner: number | null = null;
     let newPlayers = [...s.players];
@@ -256,7 +260,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
       const defenderStillHas = Object.values(newTerritories).some(t => t.ownerId === defenderId);
       if (!defenderStillHas) {
         newPlayers[defenderId] = { ...newPlayers[defenderId], eliminated: true };
-        // Transfer cards
         newPlayers[s.currentPlayerIndex] = {
           ...newPlayers[s.currentPlayerIndex],
           cards: [...newPlayers[s.currentPlayerIndex].cards, ...newPlayers[defenderId].cards],
@@ -265,8 +268,17 @@ export const useGameStore = create<GameStore>((set, get) => ({
         get().addLog(`${PLAYER_NAMES[defenderId]} eliminated!`);
       }
 
+      // Check win conditions
       const allOwned = Object.values(newTerritories).every(t => t.ownerId === s.currentPlayerIndex);
-      if (allOwned) winner = s.currentPlayerIndex;
+      if (allOwned) {
+        winner = s.currentPlayerIndex;
+      } else if (s.useMissions && s.missions[s.currentPlayerIndex]) {
+        const eliminated = newPlayers.map(p => p.eliminated);
+        if (checkMissionComplete(s.currentPlayerIndex, s.missions[s.currentPlayerIndex], newTerritories, eliminated)) {
+          winner = s.currentPlayerIndex;
+          get().addLog(`🎯 ${PLAYER_NAMES[s.currentPlayerIndex]} completed their secret mission!`);
+        }
+      }
     }
 
     set({
@@ -285,16 +297,14 @@ export const useGameStore = create<GameStore>((set, get) => ({
   moveArmiesAfterCapture: (count: number) => {
     const s = get();
     if (!s.capturedTerritory || !s.awaitingMoveIn) return;
-    // Find where armies came from - last attack source
     const lastSource = Object.entries(s.territories)
       .find(([id, t]) => t.ownerId === s.currentPlayerIndex && t.armies > 1 &&
         TERRITORIES.find(tt => tt.id === id)?.adjacent.includes(s.capturedTerritory!));
 
     if (!lastSource) return;
     const [sourceId, sourceState] = lastSource;
-    const minMove = 1;
     const maxMove = sourceState.armies - 1;
-    count = Math.max(minMove, Math.min(count, maxMove));
+    count = Math.max(1, Math.min(count, maxMove));
 
     set({
       territories: {
@@ -350,7 +360,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
       set({ phase: 'ATTACK', attackSource: null, attackTarget: null, lastDiceRoll: null });
       get().addLog('Attack phase');
     } else if (s.phase === 'ATTACK') {
-      // Award card if conquered
       if (s.hasConqueredThisTurn && s.deck.length > 0) {
         const [card, ...rest] = s.deck;
         const newPlayers = [...s.players];
@@ -364,7 +373,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
       set({ phase: 'FORTIFY', fortifySource: null, fortifyTarget: null, attackSource: null, attackTarget: null });
       get().addLog('Fortify phase');
     } else if (s.phase === 'FORTIFY') {
-      // Next player
       let next = (s.currentPlayerIndex + 1) % 6;
       while (s.players[next].eliminated) {
         next = (next + 1) % 6;
@@ -382,7 +390,79 @@ export const useGameStore = create<GameStore>((set, get) => ({
         attackTarget: null,
         lastDiceRoll: null,
       });
-      get().addLog(`${PLAYER_NAMES[next]}'s turn — ${reinforcements} reinforcements`);
+      get().addLog(`${s.players[next].isAI ? '🤖 ' : ''}${PLAYER_NAMES[next]}'s turn — ${reinforcements} reinforcements`);
+
+      // Auto-run AI turn
+      if (s.players[next].isAI) {
+        setTimeout(() => get().runAITurn(), 600);
+      }
+    }
+  },
+
+  runAITurn: () => {
+    const s = get();
+    const player = s.players[s.currentPlayerIndex];
+    if (!player.isAI) return;
+
+    // Auto trade cards if possible
+    if (player.cards.length >= 3) {
+      const ids = player.cards.slice(0, 3).map(c => c.id);
+      get().tradeInCards(ids);
+    }
+
+    // Reinforce
+    const reinforceActions = aiReinforce(s.currentPlayerIndex, get().territories, get().reinforcementsLeft);
+    for (const action of reinforceActions) {
+      get().placeReinforcement(action.territoryId);
+    }
+
+    // Move to attack phase
+    get().endPhase();
+
+    // Attack
+    const attacks = aiDecideAttacks(s.currentPlayerIndex, get().territories);
+    for (const attack of attacks) {
+      const currentTerritories = get().territories;
+      const src = currentTerritories[attack.source];
+      const tgt = currentTerritories[attack.target];
+      if (!src || !tgt || src.ownerId !== s.currentPlayerIndex || tgt.ownerId === s.currentPlayerIndex) continue;
+      if (src.armies < 2) continue;
+
+      get().selectAttackSource(attack.source);
+      get().selectAttackTarget(attack.target);
+      const maxDice = Math.min(3, get().territories[attack.source].armies - 1);
+      const defDice = Math.min(2, get().territories[attack.target].armies);
+      if (maxDice >= 1 && defDice >= 1) {
+        get().executeAttack(maxDice, defDice);
+        // Handle move-in after capture
+        if (get().awaitingMoveIn) {
+          const capturedTerr = get().capturedTerritory;
+          if (capturedTerr) {
+            const srcState = Object.entries(get().territories)
+              .find(([id, t]) => t.ownerId === s.currentPlayerIndex && t.armies > 1 &&
+                TERRITORIES.find(tt => tt.id === id)?.adjacent.includes(capturedTerr));
+            if (srcState) {
+              const moveCount = Math.max(1, Math.floor((srcState[1].armies - 1) / 2));
+              get().moveArmiesAfterCapture(moveCount);
+            }
+          }
+        }
+      }
+
+      if (get().winner !== null) return;
+    }
+
+    // End attack → fortify
+    get().endPhase();
+
+    // Fortify
+    const fortifyAction = aiFortify(s.currentPlayerIndex, get().territories);
+    if (fortifyAction) {
+      get().selectFortifySource(fortifyAction.source);
+      get().selectFortifyTarget(fortifyAction.target);
+      get().executeFortify(fortifyAction.count);
+    } else {
+      get().endPhase(); // skip fortify
     }
   },
 }));
