@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion';
 import { useGameStore } from '../game/store';
+import { useMultiplayerStore } from '../game/multiplayerStore';
 import { TERRITORIES, TERRITORY_MAP, CONTINENT_COLORS } from '../game/mapData';
 
 // Connection lines between adjacent territories
@@ -44,20 +45,29 @@ const PLAYER_HSL_DIM = [
   'hsl(48, 50%, 22%)', 'hsl(270, 40%, 22%)', 'hsl(24, 50%, 22%)',
 ];
 
-export default function GameMap() {
-  const territories = useGameStore(s => s.territories);
-  const phase = useGameStore(s => s.phase);
-  const currentPlayerIndex = useGameStore(s => s.currentPlayerIndex);
-  const attackSource = useGameStore(s => s.attackSource);
-  const attackTarget = useGameStore(s => s.attackTarget);
-  const fortifySource = useGameStore(s => s.fortifySource);
-  const placeReinforcement = useGameStore(s => s.placeReinforcement);
-  const selectAttackSource = useGameStore(s => s.selectAttackSource);
-  const selectAttackTarget = useGameStore(s => s.selectAttackTarget);
-  const selectFortifySource = useGameStore(s => s.selectFortifySource);
-  const selectFortifyTarget = useGameStore(s => s.selectFortifyTarget);
+export default function GameMap({ multiplayer = false }: { multiplayer?: boolean }) {
+  // Use the appropriate store based on mode
+  const localStore = useGameStore();
+  const mpStore = useMultiplayerStore();
+
+  const territories = multiplayer ? mpStore.territories : localStore.territories;
+  const phase = multiplayer ? mpStore.phase : localStore.phase;
+  const currentPlayerIndex = multiplayer ? mpStore.currentPlayerIndex : localStore.currentPlayerIndex;
+  const attackSource = multiplayer ? mpStore.attackSource : localStore.attackSource;
+  const attackTarget = multiplayer ? mpStore.attackTarget : localStore.attackTarget;
+  const fortifySource = multiplayer ? mpStore.fortifySource : localStore.fortifySource;
+
+  const placeReinforcement = multiplayer ? mpStore.placeReinforcement : localStore.placeReinforcement;
+  const selectAttackSource = multiplayer ? mpStore.selectAttackSource : localStore.selectAttackSource;
+  const selectAttackTarget = multiplayer ? mpStore.selectAttackTarget : localStore.selectAttackTarget;
+  const selectFortifySource = multiplayer ? mpStore.selectFortifySource : localStore.selectFortifySource;
+  const selectFortifyTarget = multiplayer ? mpStore.selectFortifyTarget : localStore.selectFortifyTarget;
+
+  // In multiplayer, only allow interaction if it's my turn
+  const isReadOnly = multiplayer && !mpStore.isMyTurn;
 
   const handleTerritoryClick = (tid: string) => {
+    if (isReadOnly) return;
     const tState = territories[tid];
     if (!tState) return;
 
@@ -129,7 +139,8 @@ export default function GameMap() {
           const isSource = attackSource === t.id || fortifySource === t.id;
           const isTarget = attackTarget === t.id;
           const isOwned = state.ownerId === currentPlayerIndex;
-          const canInteract = phase === 'REINFORCE' ? isOwned :
+          const canInteract = isReadOnly ? false :
+            phase === 'REINFORCE' ? isOwned :
             phase === 'ATTACK' ? true :
             phase === 'FORTIFY' ? isOwned : false;
 
