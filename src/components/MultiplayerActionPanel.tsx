@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useMultiplayerStore } from '../game/multiplayerStore';
 import { TERRITORY_MAP } from '../game/mapData';
-import { Swords, Shield, Move, ChevronRight, Dices, Target, Clock, History } from 'lucide-react';
+import { Swords, Shield, Move, ChevronRight, Dices, Target, Clock, History, Coins } from 'lucide-react';
 
 function DiceDisplay({ rolls, label, color }: { rolls: number[]; label: string; color: string }) {
   return (
@@ -95,6 +95,37 @@ export default function MultiplayerActionPanel() {
             <span className="text-xs font-semibold">YOUR SECRET MISSION</span>
           </div>
           <p className="text-xs text-foreground/80">{myMission}</p>
+        </div>
+      )}
+
+      {/* Your Cards - only visible when it's your turn */}
+      {isMyTurn && myPlayer && myPlayer.cards && myPlayer.cards.length > 0 && (
+        <div className="px-4 py-2 border-b border-border bg-muted/30">
+          <div className="flex items-center gap-1.5 text-amber-500 mb-2">
+            <Coins size={12} />
+            <span className="text-xs font-semibold">YOUR CARDS ({myPlayer.cards.length})</span>
+          </div>
+          <div className="grid grid-cols-4 gap-1.5">
+            {[
+              { type: 'Infantry', color: 'hsl(0, 84%, 60%)' },
+              { type: 'Cavalry', color: 'hsl(48, 96%, 53%)' },
+              { type: 'Artillery', color: 'hsl(217, 91%, 60%)' },
+              { type: 'Wild', color: 'hsl(270, 67%, 60%)' },
+            ].map(card => {
+              const count = (myPlayer.cards || []).filter((c) => c.type === card.type).length;
+              return count > 0 ? (
+                <div key={card.type} className="flex flex-col items-center bg-secondary rounded px-1.5 py-1">
+                  <span className="font-mono-tabular text-sm font-bold text-foreground">{count}</span>
+                  <span className="text-xs text-muted-foreground text-center leading-tight">{card.type}</span>
+                </div>
+              ) : null;
+            })}
+          </div>
+          {myPlayer.cards.length >= 3 && (
+            <div className="mt-1.5 p-1.5 bg-primary/20 rounded text-xs text-primary text-center font-medium">
+              You can trade 3+ cards!
+            </div>
+          )}
         </div>
       )}
 

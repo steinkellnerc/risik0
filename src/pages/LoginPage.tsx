@@ -1,15 +1,14 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useAuth } from '../lib/auth';
-import { LogIn, UserPlus, User } from 'lucide-react';
+import { LogIn, UserPlus } from 'lucide-react';
 
 export default function LoginPage() {
-  const { signIn, signUp, signInAsGuest } = useAuth();
+  const { signIn, signUp } = useAuth();
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
-  const [guestName, setGuestName] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -31,21 +30,6 @@ export default function LoginPage() {
         const { error } = await signUp(email, password, displayName);
         if (error) setError(error.message);
       }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleGuestSignIn = async () => {
-    if (!guestName.trim()) {
-      setError('Enter a name to play as guest');
-      return;
-    }
-    setError('');
-    setLoading(true);
-    try {
-      const { error } = await signInAsGuest(guestName);
-      if (error) setError(error.message);
     } finally {
       setLoading(false);
     }
@@ -125,37 +109,6 @@ export default function LoginPage() {
               {loading ? 'Loading...' : mode === 'login' ? 'Sign In' : 'Create Account'}
             </button>
           </form>
-        </div>
-
-        {/* Divider */}
-        <div className="flex items-center gap-3">
-          <div className="flex-1 h-px bg-border" />
-          <span className="text-xs text-muted-foreground">or</span>
-          <div className="flex-1 h-px bg-border" />
-        </div>
-
-        {/* Guest sign in */}
-        <div className="bg-surface rounded-xl p-5 space-y-3 shadow-elevated">
-          <div className="flex items-center gap-2 text-foreground">
-            <User size={16} />
-            <span className="text-sm font-semibold">Play as Guest</span>
-          </div>
-          <div className="flex gap-2">
-            <input
-              type="text"
-              placeholder="Your name"
-              value={guestName}
-              onChange={e => setGuestName(e.target.value)}
-              className="flex-1 px-3 py-2 rounded-lg bg-muted text-foreground text-sm placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-2 focus:ring-primary"
-            />
-            <button
-              onClick={handleGuestSignIn}
-              disabled={loading}
-              className="px-4 py-2 bg-secondary text-foreground rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-50"
-            >
-              Go
-            </button>
-          </div>
         </div>
 
         {error && (

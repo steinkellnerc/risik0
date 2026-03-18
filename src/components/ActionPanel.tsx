@@ -1,9 +1,28 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useGameStore } from '../game/store';
-import { PLAYER_NAMES } from '../game/types';
+import { PLAYER_NAMES, type RiskCard } from '../game/types';
 import { TERRITORY_MAP } from '../game/mapData';
-import { Swords, Shield, Move, ChevronRight, Dices, Target } from 'lucide-react';
+import { Swords, Shield, Move, ChevronRight, Dices, Target, ScrollText } from 'lucide-react';
+
+function isValidSet(cards: RiskCard[]): boolean {
+  if (cards.length !== 3) return false;
+  const types = cards.map(c => c.type);
+  const wilds = types.filter(t => t === 'Wild').length;
+  const nonWild = types.filter(t => t !== 'Wild');
+  if (wilds >= 2) return true;
+  if (wilds === 1) return true;
+  if (nonWild[0] === nonWild[1] && nonWild[1] === nonWild[2]) return true;
+  if (new Set(nonWild).size === 3) return true;
+  return false;
+}
+
+const CARD_LABELS: Record<string, string> = {
+  Infantry: '⚔ Infantry',
+  Cavalry: '🐴 Cavalry',
+  Artillery: '💣 Artillery',
+  Wild: '★ Wild',
+};
 
 function DiceDisplay({ rolls, label, color }: { rolls: number[]; label: string; color: string }) {
   return (
@@ -25,6 +44,95 @@ function DiceDisplay({ rolls, label, color }: { rolls: number[]; label: string; 
   );
 }
 
+function CardsPanel({
+  cards, phase, selectedCardIds, setSelectedCardIds, onTrade,
+}: {
+  cards: RiskCard[];
+  phase: string;
+  selectedCardIds: string[];
+  setSelectedCardIds: (ids: string[]) => void;
+  onTrade: (ids: string[]) => void;
+}) {
+  const mustTrade = cards.length >= 5;
+  const selectedCards = cards.filter(c => selectedCardIds.includes(c.id));
+  const canTrade = selectedCards.length === 3 && isValidSet(selectedCards);
+  const canSelect = phase === 'REINFORCE';
+
+  const toggleCard = (id: string) => {
+    if (!canSelect) return;
+    if (selectedCardIds.includes(id)) {
+      setSelectedCardIds(selectedCardIds.filter(s => s !== id));
+    } else if (selectedCardIds.length < 3) {
+      setSelectedCardIds([...selectedCardIds, id]);
+    }
+  };
+
+  return (
+    <div className={`px-4 py-2 border-b border-border ${mustTrade ? 'bg-destructive/10' : 'bg-muted/20'}`}>
+      <div className="flex items-center justify-between mb-1.5">
+        <div className="flex items-center gap-1.5 text-muted-foreground">
+          <ScrollText size={12} />
+          <span className="text-xs font-semibold">CARDS ({cards.length})</span>
+        </div>
+        {mustTrade && (
+          <span className="text-xs font-bold text-destructive">MUST TRADE</span>
+        )}
+      </div>
+
+      {cards.length === 0 ? (
+        <p className="text-xs text-muted-foreground/60">No cards yet — earn one by conquering a territory.</p>
+      ) : (
+        <>
+          <div className="flex flex-wrap gap-1 mb-2">
+            {cards.map(card => {
+              const isSelected = selectedCardIds.includes(card.id);
+              const isDisabled = !isSelected && selectedCardIds.length >= 3;
+              return (
+                <button
+                  key={card.id}
+                  onClick={() => toggleCard(card.id)}
+                  disabled={!canSelect || isDisabled}
+                  className={`px-2 py-0.5 rounded text-xs font-medium border transition-all ${
+                    isSelected
+                      ? 'bg-primary text-primary-foreground border-primary'
+                      : canSelect && !isDisabled
+                      ? 'bg-secondary text-foreground border-border hover:border-primary/60 cursor-pointer'
+                      : 'bg-secondary text-muted-foreground border-border opacity-70'
+                  }`}
+                >
+                  {CARD_LABELS[card.type]}
+                </button>
+              );
+            })}
+          </div>
+
+          {canSelect && selectedCardIds.length > 0 && (
+            <button
+              onClick={() => onTrade(selectedCardIds)}
+              disabled={!canTrade}
+              className="w-full px-3 py-1.5 bg-primary text-primary-foreground rounded-md text-xs font-medium hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {selectedCardIds.length < 3
+                ? `Select ${3 - selectedCardIds.length} more`
+                : canTrade
+                ? 'Trade Selected Cards'
+                : 'Invalid set — try another combo'}
+            </button>
+          )}
+
+          {canSelect && selectedCardIds.length === 0 && cards.length >= 3 && (
+            <p className="text-xs text-muted-foreground">Tap cards to select a set of 3 to trade</p>
+          )}
+
+          {!canSelect && cards.length > 0 && (
+            <p className="text-xs text-muted-foreground/60">Trade available during Reinforce phase</p>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 export default function ActionPanel() {
   const {
     phase, currentPlayerIndex, reinforcementsLeft, attackSource, attackTarget,
@@ -35,6 +143,7 @@ export default function ActionPanel() {
 
   const [moveCount, setMoveCount] = useState(1);
   const [fortifyCount, setFortifyCount] = useState(1);
+  const [selectedCardIds, setSelectedCardIds] = useState<string[]>([]);
 
   const player = players[currentPlayerIndex];
   const pName = PLAYER_NAMES[currentPlayerIndex];
@@ -69,9 +178,13 @@ export default function ActionPanel() {
           </span>
         </div>
         <p className="text-sm text-muted-foreground mt-1">
-          {phase === 'REINFORCE' && `Place ${reinforcementsLeft} reinforcements on your territories.`}
-          {phase === 'ATTACK' && 'Select a territory to attack from, then a target.'}
-          {phase === 'FORTIFY' && 'Move armies between two adjacent territories, or skip.'}
+          {phase === 'REINFORCE' && player?.cards.length >= 5
+            ? 'You must trade in cards before placing troops.'
+            : phase === 'REINFORCE'
+            ? `Place ${reinforcementsLeft} reinforcements on your territories.`
+            : phase === 'ATTACK'
+            ? 'Select a territory to attack from, then a target.'
+            : 'Move armies between two adjacent territories, or skip.'}
         </p>
       </div>
 
@@ -84,6 +197,17 @@ export default function ActionPanel() {
           </div>
           <p className="text-xs text-foreground/80">{missions[currentPlayerIndex].description}</p>
         </div>
+      )}
+
+      {/* Cards */}
+      {!player?.isAI && (
+        <CardsPanel
+          cards={player?.cards ?? []}
+          phase={phase}
+          selectedCardIds={selectedCardIds}
+          setSelectedCardIds={setSelectedCardIds}
+          onTrade={(ids) => { tradeInCards(ids); setSelectedCardIds([]); }}
+        />
       )}
 
       {/* Phase actions */}
@@ -99,19 +223,6 @@ export default function ActionPanel() {
               <span className="font-mono-tabular text-2xl font-bold text-foreground">{reinforcementsLeft}</span>
               <p className="text-xs text-muted-foreground mt-1">armies remaining</p>
             </div>
-
-            {/* Card trade-in */}
-            {player?.cards.length >= 3 && (
-              <div className="bg-secondary rounded-lg p-3 space-y-2">
-                <span className="text-xs text-muted-foreground">You have {player.cards.length} cards</span>
-                <button onClick={() => {
-                  const ids = player.cards.slice(0, 3).map(c => c.id);
-                  tradeInCards(ids);
-                }} className="w-full px-3 py-1.5 bg-primary text-primary-foreground rounded-md text-xs font-medium hover:opacity-90 transition-opacity">
-                  Trade In Cards
-                </button>
-              </div>
-            )}
 
             {reinforcementsLeft === 0 && (
               <button onClick={endPhase}

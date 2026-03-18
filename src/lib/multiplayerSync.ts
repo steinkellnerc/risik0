@@ -100,21 +100,15 @@ export async function joinGame(
   // Find the next available slot
   const { data: existingPlayers } = await supabase
     .from('players')
-    .select('slot_index')
+    .select('slot_index, user_id')
     .eq('game_id', gameId)
     .order('slot_index');
 
   const takenSlots = new Set(existingPlayers?.map(p => p.slot_index) ?? []);
 
-  // Check if user already joined
-  const { data: existing } = await supabase
-    .from('players')
-    .select('slot_index')
-    .eq('game_id', gameId)
-    .eq('user_id', userId)
-    .maybeSingle();
-
-  if (existing) return existing.slot_index;
+  // Check if user already joined (even if RLS blocks this, we can infer from the list)
+  const userAlreadyJoined = existingPlayers?.find(p => p.user_id === userId);
+  if (userAlreadyJoined) return userAlreadyJoined.slot_index;
 
   let slotIndex = -1;
   for (let i = 0; i < 6; i++) {
@@ -135,6 +129,12 @@ export async function joinGame(
       color: PLAYER_COLORS[slotIndex],
       is_ai: false,
     });
+
+  // If duplicate key error, user likely already exists - that's ok
+  if (error?.code === '23505') {
+    console.log('Player already joined this game');
+    return slotIndex;
+  }
 
   if (error) throw new Error(error.message);
 
@@ -377,6 +377,7 @@ export async function listOpenGames(): Promise<Array<{
   created_at: string;
   status: string;
   playerCount: number;
+  hostUserId: string | null;
 }>> {
   const { data: games } = await supabase
     .from('games')
@@ -389,12 +390,34 @@ export async function listOpenGames(): Promise<Array<{
 
   const results = [];
   for (const game of games) {
-    const { count } = await supabase
-      .from('players')
-      .select('*', { count: 'exact', head: true })
-      .eq('game_id', game.id)
-      .eq('is_ai', false);
-    results.push({ ...game, playerCount: count ?? 0 });
+    const [countResult, hostResult] = await Promise.all([
+      supabase
+        .from('players')
+        .select('*', { count: 'exact', head: true })
+        .eq('game_id', game.id)
+        .eq('is_ai', false),
+      supabase
+        .from('players')
+        .select('user_id')
+        .eq('game_id', game.id)
+        .eq('slot_index', 0)
+        .single(),
+    ]);
+    results.push({
+      ...game,
+      playerCount: countResult.count ?? 0,
+      hostUserId: (hostResult.data?.user_id as string | null) ?? null,
+    });
   }
   return results;
+}
+
+// ==================== CANCEL GAME ====================
+
+export async function cancelGame(gameId: string): Promise<void> {
+  const { error } = await supabase
+    .from('games')
+    .update({ status: 'CANCELLED' })
+    .eq('id', gameId);
+  if (error) throw new Error(error.message);
 }

@@ -124,41 +124,45 @@ export function aiDecideAttacks(
 ): AIAttackAction[] {
   const attacks: AIAttackAction[] = [];
   const owned = getOwned(playerIndex, territories);
+  const progress = continentProgress(playerIndex, territories);
 
   // Build candidate attacks
-  const candidates: { source: string; target: string; ratio: number; continentBonus: number }[] = [];
+  const candidates: { source: string; target: string; ratio: number; score: number }[] = [];
 
   for (const tid of owned) {
     if (territories[tid].armies < 2) continue;
     const t = TERRITORY_MAP.get(tid)!;
     for (const adj of t.adjacent) {
       if (territories[adj]?.ownerId === playerIndex) continue;
-      const ratio = territories[tid].armies / territories[adj].armies;
-      // Continent completion bonus
+      const ratio = territories[tid].armies / Math.max(1, territories[adj].armies);
+
+      // Continent completion bonus — aggressively pursue near-complete continents
       let continentBonus = 0;
-      const progress = continentProgress(playerIndex, territories);
       for (const p of progress) {
         if (p.continent.territories.includes(adj) && p.remaining <= 3) {
-          continentBonus = (4 - p.remaining) * 2;
+          continentBonus = (4 - p.remaining) * 3;
         }
       }
-      candidates.push({ source: tid, target: adj, ratio, continentBonus });
+
+      // Eliminate weakened players (target has only 1 army = easy pick)
+      const easyPickBonus = territories[adj].armies === 1 ? 2 : 0;
+
+      candidates.push({ source: tid, target: adj, ratio, score: ratio + continentBonus + easyPickBonus });
     }
   }
 
-  // Sort by strategic value: continent completion first, then army ratio
-  candidates.sort((a, b) => (b.continentBonus + b.ratio) - (a.continentBonus + a.ratio));
+  // Sort by strategic value
+  candidates.sort((a, b) => b.score - a.score);
 
-  // Only attack when we have good odds (ratio >= 1.5) or strong continent motivation
   for (const c of candidates) {
-    if (c.ratio >= 1.5 || (c.continentBonus > 0 && c.ratio >= 1.2)) {
+    // Attack if ratio >= 1.2, or at equal odds for strong continent/easy-pick motivation
+    if (c.ratio >= 1.2 || (c.score >= 3 && c.ratio >= 0.9)) {
       const maxDice = Math.min(3, territories[c.source].armies - 1);
       if (maxDice >= 1) {
         attacks.push({ type: 'attack', source: c.source, target: c.target, dice: maxDice });
       }
     }
-    // Limit to 5 attacks per turn to keep games moving
-    if (attacks.length >= 5) break;
+    if (attacks.length >= 12) break;
   }
 
   return attacks;
@@ -175,42 +179,38 @@ export function aiFortify(
   playerIndex: number,
   territories: Record<string, TerritoryState>
 ): AIFortifyAction | null {
-  const interior = getInterior(playerIndex, territories);
-  const borders = getBorders(playerIndex, territories);
-  if (interior.length === 0 || borders.length === 0) return null;
+  const owned = getOwned(playerIndex, territories);
+  const borderSet = new Set(getBorders(playerIndex, territories));
+  if (borderSet.size === 0) return null;
 
-  // Find interior territory with most armies
-  let bestInterior = '';
-  let bestInteriorArmies = 0;
-  for (const tid of interior) {
-    if (territories[tid].armies > bestInteriorArmies) {
-      bestInteriorArmies = territories[tid].armies;
-      bestInterior = tid;
-    }
-  }
+  // Find the best source→target pair:
+  // source = any owned territory with > 1 army
+  // target = an adjacent owned border with higher threat than the source
+  let bestAction: AIFortifyAction | null = null;
+  let bestScore = -Infinity;
 
-  if (!bestInterior || bestInteriorArmies <= 1) return null;
+  for (const src of owned) {
+    if (territories[src].armies <= 1) continue;
+    const srcThreat = borderSet.has(src) ? borderThreatScore(src, playerIndex, territories) : -10;
+    const t = TERRITORY_MAP.get(src)!;
 
-  // Find weakest adjacent border
-  const t = TERRITORY_MAP.get(bestInterior)!;
-  let bestBorder = '';
-  let bestBorderScore = -Infinity;
-  for (const adj of t.adjacent) {
-    if (territories[adj]?.ownerId === playerIndex && borders.includes(adj)) {
-      const score = borderThreatScore(adj, playerIndex, territories);
-      if (score > bestBorderScore) {
-        bestBorderScore = score;
-        bestBorder = adj;
+    for (const adj of t.adjacent) {
+      if (territories[adj]?.ownerId !== playerIndex) continue;
+      if (!borderSet.has(adj)) continue;
+      const adjThreat = borderThreatScore(adj, playerIndex, territories);
+      // Only move armies if the destination is more threatened than the source
+      const score = adjThreat - srcThreat;
+      if (score > bestScore) {
+        bestScore = score;
+        bestAction = {
+          type: 'fortify',
+          source: src,
+          target: adj,
+          count: territories[src].armies - 1,
+        };
       }
     }
   }
 
-  if (!bestBorder) return null;
-
-  return {
-    type: 'fortify',
-    source: bestInterior,
-    target: bestBorder,
-    count: territories[bestInterior].armies - 1,
-  };
+  return bestAction;
 }

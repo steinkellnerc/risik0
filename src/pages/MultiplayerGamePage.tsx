@@ -7,13 +7,16 @@ import { supabase } from '../lib/supabase';
 import GameMap from '../components/GameMap';
 import MultiplayerActionPanel from '../components/MultiplayerActionPanel';
 import MultiplayerStatusBar from '../components/MultiplayerStatusBar';
-import { Play, Users, Copy, Check } from 'lucide-react';
+import { Play, Users, Copy, Check, AlertCircle } from 'lucide-react';
 
 export default function MultiplayerGamePage() {
   const { gameId } = useParams<{ gameId: string }>();
   const { user } = useAuth();
   const navigate = useNavigate();
   const [copied, setCopied] = useState(false);
+  const [humanSlots, setHumanSlots] = useState(2);
+  const [error, setError] = useState('');
+  const [isStarting, setIsStarting] = useState(false);
 
   const {
     connect, disconnect, status, players, connected, mySlotIndex,
@@ -23,16 +26,37 @@ export default function MultiplayerGamePage() {
   useEffect(() => {
     if (!gameId || !user) return;
 
-    // Auto-join if not already in the game
-    joinGame(gameId, user.id, user.user_metadata?.display_name || user.email?.split('@')[0] || 'Player')
-      .then(() => connect(gameId, user.id))
-      .catch(() => {
-        // Already joined, just connect
-        connect(gameId, user.id);
-      });
+    const connectToGame = async () => {
+      let knownSlot: number | null = null;
+      try {
+        // Try to join - if already joined, it will return existing slot
+        knownSlot = await joinGame(gameId, user.id, user.user_metadata?.display_name || user.email?.split('@')[0] || 'Player');
+      } catch (err) {
+        console.log('Join attempt:', err);
+      }
+
+      // Always try to connect regardless of join result
+      try {
+        await connect(gameId, user.id);
+        // If mySlotIndex is still null (e.g. RLS prevented reading player row),
+        // fall back to the slot we know from joinGame
+        const state = useMultiplayerStore.getState();
+        if (state.mySlotIndex === null && knownSlot !== null) {
+          useMultiplayerStore.setState({
+            mySlotIndex: knownSlot,
+            isMyTurn: knownSlot === state.currentPlayerIndex,
+          });
+        }
+      } catch (err) {
+        console.error('Connection failed:', err);
+        setError('Failed to connect to game');
+      }
+    };
+
+    connectToGame();
 
     return () => disconnect();
-  }, [gameId, user]);
+  }, [gameId, user, connect, disconnect]);
 
   // Subscribe to player changes in lobby
   useEffect(() => {
@@ -53,9 +77,17 @@ export default function MultiplayerGamePage() {
 
   const handleStartGame = async () => {
     if (!gameId) return;
-    const store = useMultiplayerStore.getState();
-    await startGame(gameId, store.useMissions);
-    if (user) await connect(gameId, user.id);
+    setIsStarting(true);
+    setError('');
+    try {
+      const store = useMultiplayerStore.getState();
+      await startGame(gameId, store.useMissions);
+      if (user) await connect(gameId, user.id);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to start game');
+    } finally {
+      setIsStarting(false);
+    }
   };
 
   const handleCopyLink = () => {
@@ -64,10 +96,27 @@ export default function MultiplayerGamePage() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  if (!connected) {
+  if (!connected || mySlotIndex === null) {
     return (
-      <div className="h-screen bg-background flex items-center justify-center">
-        <div className="text-muted-foreground animate-pulse">Connecting to game...</div>
+      <div className="h-screen bg-background flex flex-col items-center justify-center gap-4 px-4">
+        <div className="text-muted-foreground animate-pulse text-center">
+          <div className="mb-2">Connecting to game...</div>
+          <div className="text-xs text-muted-foreground/60">Game ID: {gameId?.slice(0, 8)}</div>
+          {error && (
+            <div className="mt-4 text-destructive text-sm bg-destructive/10 rounded p-2">
+              {error}
+              <button
+                onClick={() => {
+                  setError('');
+                  if (user) connect(gameId!, user.id);
+                }}
+                className="block mt-2 text-xs underline hover:no-underline"
+              >
+                Retry
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     );
   }
@@ -82,7 +131,9 @@ export default function MultiplayerGamePage() {
         <div className="w-full max-w-md space-y-6">
           <div className="text-center space-y-2">
             <h1 className="text-3xl font-bold text-foreground tracking-tight">Game Lobby</h1>
-            <p className="text-muted-foreground text-sm">Waiting for players to join...</p>
+            <p className="text-muted-foreground text-sm">
+              {mySlotIndex !== null ? `You are Player ${mySlotIndex + 1}${isHost ? ' (Host)' : ''}` : 'Connecting...'}
+            </p>
           </div>
 
           {/* Share link */}
@@ -112,26 +163,59 @@ export default function MultiplayerGamePage() {
                 )}
               </div>
             ))}
-            {humanPlayers.length < 6 && (
-              <div className="text-xs text-muted-foreground text-center py-2">
-                Empty slots will be filled with AI
-              </div>
-            )}
           </div>
 
-          {/* Start button (host only) */}
+          {/* Human slots selector (host only) */}
           {isHost && (
-            <button
-              onClick={handleStartGame}
-              className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-primary text-primary-foreground rounded-xl text-base font-bold hover:opacity-90 transition-opacity shadow-glow"
-            >
-              <Play size={18} /> Start Game
-            </button>
+            <div className="bg-surface rounded-xl p-4 space-y-3 shadow-elevated">
+              <span className="text-sm font-semibold text-foreground">Human Slots</span>
+              <div className="flex gap-2">
+                {[2, 3, 4, 5, 6].map(num => (
+                  <button
+                    key={num}
+                    onClick={() => setHumanSlots(num)}
+                    className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${
+                      humanSlots === num
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-secondary text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    {num}
+                  </button>
+                ))}
+              </div>
+              <div className="text-xs text-muted-foreground">
+                {6 - humanSlots} slot{6 - humanSlots !== 1 ? 's' : ''} will be AI
+              </div>
+            </div>
           )}
 
-          {!isHost && (
+          {/* Start button (host only) */}
+          {isHost ? (
+            <>
+              <button
+                onClick={handleStartGame}
+                disabled={isStarting || humanPlayers.length < 1}
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-primary text-primary-foreground rounded-xl text-base font-bold hover:opacity-90 transition-opacity shadow-glow disabled:opacity-50"
+              >
+                <Play size={18} /> {isStarting ? 'Starting...' : 'Start Game'}
+              </button>
+              {humanPlayers.length < 1 && (
+                <div className="text-xs text-muted-foreground text-center">
+                  At least 1 human player needed to start
+                </div>
+              )}
+            </>
+          ) : (
             <div className="text-center text-muted-foreground text-sm">
               Waiting for host to start the game...
+            </div>
+          )}
+
+          {error && (
+            <div className="flex gap-2 text-destructive text-sm bg-destructive/10 rounded-lg px-3 py-2">
+              <AlertCircle size={16} className="flex-shrink-0 mt-0.5" />
+              <span>{error}</span>
             </div>
           )}
         </div>

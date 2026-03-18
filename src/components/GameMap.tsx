@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion';
 import { useGameStore } from '../game/store';
 import { useMultiplayerStore } from '../game/multiplayerStore';
-import { TERRITORIES, TERRITORY_MAP, CONTINENT_COLORS } from '../game/mapData';
+import { TERRITORIES, TERRITORY_MAP, CONTINENT_COLORS, CONTINENTS } from '../game/mapData';
 
 // Connection lines between adjacent territories
 function ConnectionLines() {
@@ -26,11 +26,90 @@ function ConnectionLines() {
   }
 
   return (
-    <g className="opacity-20">
+    <g className="opacity-40">
       {lines.map((l, i) => (
         <line key={i} x1={l.x1} y1={l.y1} x2={l.x2} y2={l.y2}
-          stroke="hsl(210, 40%, 40%)" strokeWidth="0.8" strokeDasharray={l.wrap ? "3,3" : undefined} />
+          stroke="hsl(210, 60%, 55%)" strokeWidth="1.2" strokeDasharray={l.wrap ? "3,3" : undefined} />
       ))}
+    </g>
+  );
+}
+
+// Continent boundary lines
+function ContinentBorders() {
+  const continentLineColors = {
+    'north-america': '#FFD700',  // Yellow
+    'south-america': '#FF4444',  // Red
+    'europe': '#4478FF',         // Blue
+    'africa': '#8B6914',         // Brown
+    'asia': '#44DD44',           // Green
+    'australia': '#AA44FF',      // Purple
+  };
+
+  return (
+    <g className="opacity-60" strokeWidth="2.5" fill="none">
+      {CONTINENTS.map(continent => {
+        const cTerritories = TERRITORIES.filter(t => t.continentId === continent.id);
+        const xs = cTerritories.map(t => t.cx);
+        const ys = cTerritories.map(t => t.cy);
+        const minX = Math.min(...xs) - 40;
+        const minY = Math.min(...ys) - 35;
+        const maxX = Math.max(...xs) + 40;
+        const maxY = Math.max(...ys) + 35;
+        const radius = 15;
+
+        return (
+          <rect
+            key={continent.id}
+            x={minX}
+            y={minY}
+            width={maxX - minX}
+            height={maxY - minY}
+            rx={radius}
+            stroke={continentLineColors[continent.id as keyof typeof continentLineColors] || '#888'}
+            strokeDasharray="5,5"
+          />
+        );
+      })}
+    </g>
+  );
+}
+
+// Continent bonus table
+function ContinentBonusTable() {
+  return (
+    <g>
+      {/* Background - bottom left corner */}
+      <rect x="10" y="415" width="132" height="95" rx="4" fill="hsl(222, 40%, 8%)" stroke="hsl(210, 50%, 50%)" strokeWidth="1.2" opacity="0.95" />
+
+      {/* Title */}
+      <text x="76" y="430" textAnchor="middle" fill="hsl(210, 80%, 70%)" fontSize="10" fontWeight="bold" fontFamily="IBM Plex Sans, sans-serif">
+        Continent Bonuses
+      </text>
+
+      {/* Divider line */}
+      <line x1="15" y1="435" x2="137" y2="435" stroke="hsl(210, 50%, 40%)" strokeWidth="0.6" />
+
+      {/* Continent rows */}
+      <g fontSize="7.5" fontFamily="IBM Plex Mono, monospace" fill="hsl(210, 70%, 65%)">
+        <text x="16" y="449">North America</text>
+        <text x="137" y="449" textAnchor="end" fill="hsl(48, 96%, 53%)">+5</text>
+
+        <text x="16" y="459">South America</text>
+        <text x="137" y="459" textAnchor="end" fill="hsl(0, 84%, 60%)">+2</text>
+
+        <text x="16" y="469">Europe</text>
+        <text x="137" y="469" textAnchor="end" fill="hsl(217, 91%, 60%)">+5</text>
+
+        <text x="16" y="479">Africa</text>
+        <text x="137" y="479" textAnchor="end" fill="hsl(24, 95%, 53%)">+3</text>
+
+        <text x="16" y="489">Asia</text>
+        <text x="137" y="489" textAnchor="end" fill="hsl(142, 71%, 45%)">+7</text>
+
+        <text x="16" y="499">Australia</text>
+        <text x="137" y="499" textAnchor="end" fill="hsl(270, 67%, 60%)">+2</text>
+      </g>
     </g>
   );
 }
@@ -105,6 +184,10 @@ export default function GameMap({ multiplayer = false }: { multiplayer?: boolean
         {/* Background */}
         <rect width="960" height="520" fill="hsl(222, 47%, 3%)" />
 
+        {/* Classic Risk board — place risk-board.jpg in /public to enable */}
+        <image href="/risk-board.jpg" x="0" y="0" width="960" height="520"
+          preserveAspectRatio="xMidYMid slice" opacity="0.07" />
+
         {/* Grid lines for tactical feel */}
         <defs>
           <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
@@ -129,6 +212,12 @@ export default function GameMap({ multiplayer = false }: { multiplayer?: boolean
         })}
 
         <ConnectionLines />
+
+        {/* Continent borders */}
+        <ContinentBorders />
+
+        {/* Continent bonus table */}
+        <ContinentBonusTable />
 
         {/* Territories */}
         {TERRITORIES.map(t => {

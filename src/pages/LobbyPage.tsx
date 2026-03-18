@@ -2,13 +2,13 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
-import { createGame, listOpenGames, joinGame } from '../lib/multiplayerSync';
-import { LogOut, Plus, Users, RefreshCw, Gamepad2, Target, Crown } from 'lucide-react';
+import { createGame, listOpenGames, joinGame, cancelGame } from '../lib/multiplayerSync';
+import { LogOut, Plus, Users, RefreshCw, Gamepad2, Target, Crown, Trash2 } from 'lucide-react';
 
 export default function LobbyPage() {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
-  const [games, setGames] = useState<Array<{ id: string; created_at: string; status: string; playerCount: number }>>([]);
+  const [games, setGames] = useState<Array<{ id: string; created_at: string; status: string; playerCount: number; hostUserId: string | null }>>([]);
   const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
   const [useMissions, setUseMissions] = useState(true);
@@ -56,6 +56,15 @@ export default function LobbyPage() {
       navigate(`/game/${gameId}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to join game');
+    }
+  };
+
+  const handleCancelGame = async (gameId: string) => {
+    try {
+      await cancelGame(gameId);
+      await refreshGames();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to cancel game');
     }
   };
 
@@ -155,12 +164,23 @@ export default function LobbyPage() {
                       {game.playerCount}/6 players
                     </span>
                   </div>
-                  <button
-                    onClick={() => handleJoinGame(game.id)}
-                    className="px-3 py-1 bg-primary text-primary-foreground rounded-md text-xs font-semibold hover:opacity-90 transition-opacity"
-                  >
-                    Join
-                  </button>
+                  <div className="flex items-center gap-2">
+                    {game.hostUserId === user?.id && (
+                      <button
+                        onClick={() => handleCancelGame(game.id)}
+                        className="p-1.5 text-muted-foreground hover:text-destructive rounded-md hover:bg-destructive/10 transition-colors"
+                        title="Cancel game"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    )}
+                    <button
+                      onClick={() => handleJoinGame(game.id)}
+                      className="px-3 py-1 bg-primary text-primary-foreground rounded-md text-xs font-semibold hover:opacity-90 transition-opacity"
+                    >
+                      {game.hostUserId === user?.id ? 'Resume' : 'Join'}
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>

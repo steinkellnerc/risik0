@@ -16,6 +16,9 @@ export default function MultiplayerStatusBar() {
   const playerArmies = (idx: number) =>
     Object.values(territories).filter(t => t.ownerId === idx).reduce((s, t) => s + t.armies, 0);
 
+  // Calculate round number (1 round = all 6 players take 1 turn each)
+  const round = Math.floor((turnNumber - 1) / 6) + 1;
+
   if (winnerId) {
     const winner = players.find(p => p.userId === winnerId);
     return (
@@ -33,8 +36,8 @@ export default function MultiplayerStatusBar() {
     <div className="h-12 bg-surface flex items-center px-4 gap-4 shadow-elevated overflow-x-auto">
       {/* Turn info */}
       <div className="flex items-center gap-2 shrink-0">
-        <span className="text-muted-foreground text-xs">TURN</span>
-        <span className="font-mono-tabular text-foreground font-semibold">{turnNumber}</span>
+        <span className="text-muted-foreground text-xs">ROUND</span>
+        <span className="font-mono-tabular text-foreground font-semibold">{round}</span>
         <span className="text-muted-foreground text-xs mx-1">|</span>
         <span className="text-xs font-semibold text-primary">{phase}</span>
         {phase === 'REINFORCE' && isMyTurn && (
