@@ -52,6 +52,18 @@ function isValidSet(cards: RiskCard[]): boolean {
   return false;
 }
 
+function findValidSet(cards: RiskCard[]): RiskCard[] | null {
+  for (let i = 0; i < cards.length - 2; i++) {
+    for (let j = i + 1; j < cards.length - 1; j++) {
+      for (let k = j + 1; k < cards.length; k++) {
+        const combo = [cards[i], cards[j], cards[k]];
+        if (isValidSet(combo)) return combo;
+      }
+    }
+  }
+  return null;
+}
+
 export interface GameStore extends GameState {
   initGame: (humanCount: number, useMissions: boolean) => void;
   placeReinforcement: (territoryId: string) => void;
@@ -163,15 +175,23 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const s = get();
     if (s.phase !== 'REINFORCE' || s.reinforcementsLeft <= 0) return;
     if (s.territories[territoryId]?.ownerId !== s.currentPlayerIndex) return;
+    // Must trade cards before placing if holding 5 or more
+    if (s.players[s.currentPlayerIndex].cards.length >= 5) return;
 
+    const newLeft = s.reinforcementsLeft - 1;
     set({
       territories: {
         ...s.territories,
         [territoryId]: { ...s.territories[territoryId], armies: s.territories[territoryId].armies + 1 },
       },
-      reinforcementsLeft: s.reinforcementsLeft - 1,
+      reinforcementsLeft: newLeft,
     });
     get().addLog(`Reinforced ${territoryId}`);
+
+    // Auto-advance to attack phase when all reinforcements are placed
+    if (newLeft === 0) {
+      get().endPhase();
+    }
   },
 
   tradeInCards: (cardIds: string[]) => {
@@ -404,10 +424,17 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const player = s.players[s.currentPlayerIndex];
     if (!player.isAI) return;
 
-    // Auto trade cards if possible
-    if (player.cards.length >= 3) {
-      const ids = player.cards.slice(0, 3).map(c => c.id);
-      get().tradeInCards(ids);
+    // Mandatory: trade until < 5 cards. Then optionally trade if >= 3.
+    let currentCards = get().players[s.currentPlayerIndex].cards;
+    while (currentCards.length >= 5) {
+      const validSet = findValidSet(currentCards);
+      if (!validSet) break;
+      get().tradeInCards(validSet.map(c => c.id));
+      currentCards = get().players[s.currentPlayerIndex].cards;
+    }
+    if (currentCards.length >= 3) {
+      const validSet = findValidSet(currentCards);
+      if (validSet) get().tradeInCards(validSet.map(c => c.id));
     }
 
     // Reinforce
@@ -419,32 +446,39 @@ export const useGameStore = create<GameStore>((set, get) => ({
     // Move to attack phase
     get().endPhase();
 
-    // Attack
-    const attacks = aiDecideAttacks(s.currentPlayerIndex, get().territories);
-    for (const attack of attacks) {
+    // Attack — re-evaluate each round so AI adapts as territories change
+    let attacksThisTurn = 0;
+    const MAX_ATTACKS = 20;
+    while (attacksThisTurn < MAX_ATTACKS) {
+      const freshAttacks = aiDecideAttacks(s.currentPlayerIndex, get().territories);
+      if (freshAttacks.length === 0) break;
+
+      const attack = freshAttacks[0];
       const currentTerritories = get().territories;
       const src = currentTerritories[attack.source];
       const tgt = currentTerritories[attack.target];
-      if (!src || !tgt || src.ownerId !== s.currentPlayerIndex || tgt.ownerId === s.currentPlayerIndex) continue;
-      if (src.armies < 2) continue;
+      if (!src || !tgt || src.ownerId !== s.currentPlayerIndex || tgt.ownerId === s.currentPlayerIndex) break;
+      if (src.armies < 2) break;
 
       get().selectAttackSource(attack.source);
       get().selectAttackTarget(attack.target);
       const maxDice = Math.min(3, get().territories[attack.source].armies - 1);
       const defDice = Math.min(2, get().territories[attack.target].armies);
-      if (maxDice >= 1 && defDice >= 1) {
-        get().executeAttack(maxDice, defDice);
-        // Handle move-in after capture
-        if (get().awaitingMoveIn) {
-          const capturedTerr = get().capturedTerritory;
-          if (capturedTerr) {
-            const srcState = Object.entries(get().territories)
-              .find(([id, t]) => t.ownerId === s.currentPlayerIndex && t.armies > 1 &&
-                TERRITORIES.find(tt => tt.id === id)?.adjacent.includes(capturedTerr));
-            if (srcState) {
-              const moveCount = Math.max(1, Math.floor((srcState[1].armies - 1) / 2));
-              get().moveArmiesAfterCapture(moveCount);
-            }
+      if (maxDice < 1 || defDice < 1) break;
+
+      get().executeAttack(maxDice, defDice);
+      attacksThisTurn++;
+
+      // Handle move-in after capture
+      if (get().awaitingMoveIn) {
+        const capturedTerr = get().capturedTerritory;
+        if (capturedTerr) {
+          const srcState = Object.entries(get().territories)
+            .find(([id, t]) => t.ownerId === s.currentPlayerIndex && t.armies > 1 &&
+              TERRITORIES.find(tt => tt.id === id)?.adjacent.includes(capturedTerr));
+          if (srcState) {
+            const moveCount = Math.max(1, Math.floor((srcState[1].armies - 1) / 2));
+            get().moveArmiesAfterCapture(moveCount);
           }
         }
       }

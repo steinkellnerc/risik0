@@ -1,13 +1,14 @@
+import { useNavigate } from 'react-router-dom';
 import { useGameStore } from '../game/store';
 import { PLAYER_NAMES } from '../game/types';
-import { TERRITORIES, TERRITORY_MAP } from '../game/mapData';
 
 const PLAYER_BG = [
   'bg-player-1', 'bg-player-2', 'bg-player-3', 'bg-player-4', 'bg-player-5', 'bg-player-6',
 ];
 
 export default function StatusBar() {
-  const { currentPlayerIndex, phase, turn, players, territories, reinforcementsLeft, winner } = useGameStore();
+  const navigate = useNavigate();
+  const { currentPlayerIndex, phase, turn, players, territories, reinforcementsLeft, winner, useMissions, initGame } = useGameStore();
 
   const playerTerritories = (idx: number) =>
     Object.values(territories).filter(t => t.ownerId === idx).length;
@@ -16,10 +17,22 @@ export default function StatusBar() {
 
   if (winner !== null) {
     return (
-      <div className="h-12 bg-surface flex items-center justify-center shadow-elevated">
+      <div className="h-12 bg-surface flex items-center justify-center gap-6 shadow-elevated px-4">
         <span className="text-lg font-semibold text-foreground">
           🏆 {PLAYER_NAMES[winner]} wins the game!
         </span>
+        <button
+          onClick={() => navigate('/')}
+          className="px-3 py-1.5 text-xs font-semibold bg-secondary text-foreground rounded-lg hover:bg-primary hover:text-primary-foreground transition-colors"
+        >
+          Return to Lobby
+        </button>
+        <button
+          onClick={() => initGame(players.filter(p => !p.isAI).length, useMissions)}
+          className="px-3 py-1.5 text-xs font-semibold bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity"
+        >
+          Play Again
+        </button>
       </div>
     );
   }
@@ -48,9 +61,10 @@ export default function StatusBar() {
           <span className="text-xs text-muted-foreground hidden lg:inline">
             {p.isAI ? '🤖' : ''}{p.name.split(' ')[0]}
           </span>
-          <span className="font-mono-tabular text-xs text-foreground">{playerTerritories(i)}</span>
-          <span className="text-muted-foreground text-xs">/</span>
-          <span className="font-mono-tabular text-xs text-foreground">{playerArmies(i)}</span>
+          <span className="font-mono-tabular text-xs text-foreground" title="territories">{playerTerritories(i)}</span>
+          <span className="text-muted-foreground text-xs">⊡</span>
+          <span className="font-mono-tabular text-xs text-foreground" title="armies">{playerArmies(i)}</span>
+          <span className="text-muted-foreground text-xs">⚔</span>
           {p.cards.length > 0 && (
             <span className="font-mono-tabular text-xs text-muted-foreground">🃏{p.cards.length}</span>
           )}
