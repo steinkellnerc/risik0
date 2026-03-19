@@ -18,7 +18,7 @@ export default function LobbyPage() {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const [games, setGames] = useState<GameEntry[]>([]);
-  const [activeGames, setActiveGames] = useState<Array<{ id: string; playerCount: number; useMissions: boolean; turnNumber: number }>>([]);
+  const [activeGames, setActiveGames] = useState<Array<{ id: string; playerCount: number; useMissions: boolean; turnNumber: number; hostUserId: string | null }>>([]);
   const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
   const [useMissions, setUseMissions] = useState(true);
@@ -80,7 +80,18 @@ export default function LobbyPage() {
     } catch (err) {
       console.error('Delete failed:', err);
       setError(err instanceof Error ? err.message : 'Failed to delete game');
-      await refreshGames(); // restore list if delete failed
+      await refreshGames();
+    }
+  };
+
+  const handleDeleteActiveGame = async (gameId: string) => {
+    setActiveGames(prev => prev.filter(g => g.id !== gameId));
+    try {
+      await cancelGame(gameId);
+    } catch (err) {
+      console.error('Delete failed:', err);
+      setError(err instanceof Error ? err.message : 'Failed to delete game');
+      await refreshGames();
     }
   };
 
@@ -180,12 +191,19 @@ export default function LobbyPage() {
                       <span className="text-xs text-muted-foreground">{game.playerCount} players</span>
                     </div>
                   </div>
-                  <button
-                    onClick={() => navigate(`/game/${game.id}`)}
-                    className="px-3 py-1.5 bg-green-600 text-white rounded-md text-xs font-semibold hover:opacity-90 transition-opacity"
-                  >
-                    Resume
-                  </button>
+                  <div className="flex items-center gap-2">
+                    {game.hostUserId === user?.id && (
+                      <button onClick={() => handleDeleteActiveGame(game.id)} className="p-1.5 text-muted-foreground hover:text-destructive rounded-md hover:bg-destructive/10 transition-colors" title="Delete game">
+                        <Trash2 size={13} />
+                      </button>
+                    )}
+                    <button
+                      onClick={() => navigate(`/game/${game.id}`)}
+                      className="px-3 py-1.5 bg-green-600 text-white rounded-md text-xs font-semibold hover:opacity-90 transition-opacity"
+                    >
+                      Resume
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>

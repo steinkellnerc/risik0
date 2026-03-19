@@ -475,6 +475,7 @@ export async function listMyActiveGames(userId: string): Promise<Array<{
   playerCount: number;
   useMissions: boolean;
   turnNumber: number;
+  hostUserId: string | null;
 }>> {
   const { data: playerRows } = await supabase
     .from('players')
@@ -487,7 +488,7 @@ export async function listMyActiveGames(userId: string): Promise<Array<{
   const gameIds = playerRows.map(r => r.game_id as string);
   const { data: games } = await supabase
     .from('games')
-    .select('id, use_missions, turn_number')
+    .select('id, use_missions, turn_number, host_user_id')
     .eq('status', 'ACTIVE')
     .in('id', gameIds);
 
@@ -505,6 +506,7 @@ export async function listMyActiveGames(userId: string): Promise<Array<{
       playerCount: count ?? 0,
       useMissions: (g.use_missions as boolean) ?? false,
       turnNumber: (g.turn_number as number) ?? 1,
+      hostUserId: (g.host_user_id as string | null) ?? null,
     });
   }
   return results;
