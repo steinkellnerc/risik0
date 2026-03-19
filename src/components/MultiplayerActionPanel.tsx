@@ -233,14 +233,14 @@ export default function MultiplayerActionPanel() {
       {/* Collapsible body */}
       <div className={`${mobileExpanded ? 'flex' : 'hidden'} md:flex flex-col flex-1 overflow-hidden max-h-[50vh] md:max-h-full`}>
 
-      {/* Secret Mission — desktop only */}
+      {/* Secret Mission */}
       {myMission && (
-        <div className="px-3 py-2 border-b border-border bg-muted/30 hidden md:block">
-          <div className="flex items-center gap-1.5 text-primary mb-1">
+        <div className="px-3 py-2 border-b border-border bg-muted/30">
+          <div className="flex items-center gap-1.5 text-primary mb-0.5">
             <Target size={11} />
             <span className="text-xs font-semibold">SECRET MISSION</span>
           </div>
-          <p className="text-xs text-foreground/80">{myMission}</p>
+          <p className="text-xs text-foreground/80 leading-snug">{myMission}</p>
         </div>
       )}
 
