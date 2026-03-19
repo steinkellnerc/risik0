@@ -379,10 +379,12 @@ export async function listOpenGames(): Promise<Array<{
   playerCount: number;
   hostUserId: string | null;
 }>> {
+  const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
   const { data: games } = await supabase
     .from('games')
     .select('id, created_at, status')
     .eq('status', 'LOBBY')
+    .gte('created_at', twoHoursAgo)
     .order('created_at', { ascending: false })
     .limit(20);
 

@@ -2,12 +2,16 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import { useMultiplayerStore } from '../game/multiplayerStore';
-import { startGame, joinGame } from '../lib/multiplayerSync';
+import { startGame, joinGame, cancelGame } from '../lib/multiplayerSync';
 import { supabase } from '../lib/supabase';
 import GameMap from '../components/GameMap';
 import MultiplayerActionPanel from '../components/MultiplayerActionPanel';
 import MultiplayerStatusBar from '../components/MultiplayerStatusBar';
-import { Play, Users, Copy, Check, AlertCircle } from 'lucide-react';
+import { Play, Users, Copy, Check, AlertCircle, ArrowLeft, Crown } from 'lucide-react';
+
+const PLAYER_BG = [
+  'bg-player-1', 'bg-player-2', 'bg-player-3', 'bg-player-4', 'bg-player-5', 'bg-player-6',
+];
 
 export default function MultiplayerGamePage() {
   const { gameId } = useParams<{ gameId: string }>();
@@ -29,17 +33,13 @@ export default function MultiplayerGamePage() {
     const connectToGame = async () => {
       let knownSlot: number | null = null;
       try {
-        // Try to join - if already joined, it will return existing slot
         knownSlot = await joinGame(gameId, user.id, user.user_metadata?.display_name || user.email?.split('@')[0] || 'Player');
       } catch (err) {
         console.log('Join attempt:', err);
       }
 
-      // Always try to connect regardless of join result
       try {
         await connect(gameId, user.id);
-        // If mySlotIndex is still null (e.g. RLS prevented reading player row),
-        // fall back to the slot we know from joinGame
         const state = useMultiplayerStore.getState();
         if (state.mySlotIndex === null && knownSlot !== null) {
           useMultiplayerStore.setState({
@@ -54,11 +54,10 @@ export default function MultiplayerGamePage() {
     };
 
     connectToGame();
-
     return () => disconnect();
   }, [gameId, user, connect, disconnect]);
 
-  // Subscribe to player changes in lobby
+  // Subscribe to player changes in lobby — re-fetch on any player change
   useEffect(() => {
     if (!gameId || status !== 'LOBBY') return;
 
@@ -67,13 +66,21 @@ export default function MultiplayerGamePage() {
       .on('postgres_changes', {
         event: '*', schema: 'public', table: 'players', filter: `game_id=eq.${gameId}`
       }, () => {
-        // Re-fetch player list by reconnecting
         if (user) connect(gameId, user.id);
       })
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, [gameId, status, user]);
+  }, [gameId, status, user, connect]);
+
+  const handleLeave = async () => {
+    const isHost = mySlotIndex === 0;
+    disconnect();
+    if (isHost && status === 'LOBBY' && gameId) {
+      try { await cancelGame(gameId); } catch { /* ignore */ }
+    }
+    navigate('/lobby');
+  };
 
   const handleStartGame = async () => {
     if (!gameId) return;
@@ -96,9 +103,16 @@ export default function MultiplayerGamePage() {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  // Connecting screen
   if (!connected || mySlotIndex === null) {
     return (
       <div className="h-screen bg-background flex flex-col items-center justify-center gap-4 px-4">
+        <button
+          onClick={() => navigate('/lobby')}
+          className="absolute top-4 left-4 flex items-center gap-1.5 px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground bg-secondary rounded-lg transition-colors"
+        >
+          <ArrowLeft size={13} /> Back to Lobby
+        </button>
         <div className="text-muted-foreground animate-pulse text-center">
           <div className="mb-2">Connecting to game...</div>
           <div className="text-xs text-muted-foreground/60">Game ID: {gameId?.slice(0, 8)}</div>
@@ -106,10 +120,7 @@ export default function MultiplayerGamePage() {
             <div className="mt-4 text-destructive text-sm bg-destructive/10 rounded p-2">
               {error}
               <button
-                onClick={() => {
-                  setError('');
-                  if (user) connect(gameId!, user.id);
-                }}
+                onClick={() => { setError(''); if (user) connect(gameId!, user.id); }}
                 className="block mt-2 text-xs underline hover:no-underline"
               >
                 Retry
@@ -123,25 +134,61 @@ export default function MultiplayerGamePage() {
 
   // Lobby view
   if (status === 'LOBBY') {
-    const humanPlayers = players.filter(p => !p.isAi && p.userId);
+    const humanPlayers = players.filter(p => !p.isAi);
     const isHost = mySlotIndex === 0;
+    const displayName = user?.user_metadata?.display_name || user?.email?.split('@')[0] || 'Player';
+
+    // Always show at least the current user even if DB fetch is slow
+    const displayPlayers = humanPlayers.length > 0
+      ? humanPlayers
+      : [{ id: 'me', slotIndex: mySlotIndex, displayName, color: '', userId: user?.id ?? null, isAi: false, armiesToPlace: 0, eliminated: false, secretObjective: null, cards: [] }];
 
     return (
       <div className="h-screen bg-background flex flex-col items-center justify-center px-4">
-        <div className="w-full max-w-md space-y-6">
-          <div className="text-center space-y-2">
+        {/* Back button */}
+        <button
+          onClick={handleLeave}
+          className="absolute top-4 left-4 flex items-center gap-1.5 px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground bg-secondary rounded-lg transition-colors"
+        >
+          <ArrowLeft size={13} /> {isHost ? 'Cancel & Leave' : 'Leave Lobby'}
+        </button>
+
+        <div className="w-full max-w-md space-y-5">
+          <div className="text-center space-y-1">
             <h1 className="text-3xl font-bold text-foreground tracking-tight">Game Lobby</h1>
             <p className="text-muted-foreground text-sm">
-              {mySlotIndex !== null ? `You are Player ${mySlotIndex + 1}${isHost ? ' (Host)' : ''}` : 'Connecting...'}
+              {isHost ? 'You are the host — invite players and start when ready' : `Waiting for host to start…`}
             </p>
+          </div>
+
+          {/* Players joined */}
+          <div className="bg-surface rounded-xl p-4 space-y-2 shadow-elevated">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-sm font-semibold text-foreground flex items-center gap-2">
+                <Users size={14} /> Players ({displayPlayers.length} / {humanSlots})
+              </span>
+            </div>
+            {displayPlayers.map(p => (
+              <div key={p.id} className="flex items-center gap-3 px-3 py-2 rounded-lg bg-muted/50">
+                <div className={`w-3 h-3 rounded-full shrink-0 ${PLAYER_BG[p.slotIndex] ?? 'bg-muted'}`} />
+                <span className="text-sm text-foreground flex-1 font-medium">{p.displayName}</span>
+                {p.slotIndex === 0 && (
+                  <span className="flex items-center gap-1 text-xs text-primary font-semibold">
+                    <Crown size={11} /> Host
+                  </span>
+                )}
+              </div>
+            ))}
+            {displayPlayers.length < humanSlots && (
+              <p className="text-xs text-muted-foreground px-1">
+                Waiting for {humanSlots - displayPlayers.length} more player{humanSlots - displayPlayers.length !== 1 ? 's' : ''}…
+              </p>
+            )}
           </div>
 
           {/* Share link */}
           <div className="bg-surface rounded-xl p-4 shadow-elevated">
-            <div className="flex items-center gap-2 text-foreground mb-2">
-              <Users size={16} />
-              <span className="text-sm font-semibold">Invite Players</span>
-            </div>
+            <p className="text-xs text-muted-foreground mb-2">Share this link to invite players:</p>
             <button
               onClick={handleCopyLink}
               className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-secondary text-foreground rounded-lg text-xs font-medium hover:opacity-90 transition-opacity"
@@ -151,26 +198,12 @@ export default function MultiplayerGamePage() {
             </button>
           </div>
 
-          {/* Player list */}
-          <div className="bg-surface rounded-xl p-4 space-y-2 shadow-elevated">
-            <span className="text-sm font-semibold text-foreground">Players ({humanPlayers.length}/6)</span>
-            {humanPlayers.map(p => (
-              <div key={p.id} className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-muted/50">
-                <div className={`w-2.5 h-2.5 rounded-full bg-${p.color}`} />
-                <span className="text-sm text-foreground flex-1">{p.displayName}</span>
-                {p.slotIndex === 0 && (
-                  <span className="text-xs text-primary">Host</span>
-                )}
-              </div>
-            ))}
-          </div>
-
           {/* Human slots selector (host only) */}
           {isHost && (
             <div className="bg-surface rounded-xl p-4 space-y-3 shadow-elevated">
-              <span className="text-sm font-semibold text-foreground">Human Slots</span>
+              <span className="text-sm font-semibold text-foreground">Human Player Slots</span>
               <div className="flex gap-2">
-                {[2, 3, 4, 5, 6].map(num => (
+                {[1, 2, 3, 4, 5, 6].map(num => (
                   <button
                     key={num}
                     onClick={() => setHumanSlots(num)}
@@ -185,36 +218,29 @@ export default function MultiplayerGamePage() {
                 ))}
               </div>
               <div className="text-xs text-muted-foreground">
-                {6 - humanSlots} slot{6 - humanSlots !== 1 ? 's' : ''} will be AI
+                {6 - humanSlots} slot{6 - humanSlots !== 1 ? 's' : ''} will be filled by AI
               </div>
             </div>
           )}
 
-          {/* Start button (host only) */}
+          {/* Start / waiting */}
           {isHost ? (
-            <>
-              <button
-                onClick={handleStartGame}
-                disabled={isStarting || humanPlayers.length < 1}
-                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-primary text-primary-foreground rounded-xl text-base font-bold hover:opacity-90 transition-opacity shadow-glow disabled:opacity-50"
-              >
-                <Play size={18} /> {isStarting ? 'Starting...' : 'Start Game'}
-              </button>
-              {humanPlayers.length < 1 && (
-                <div className="text-xs text-muted-foreground text-center">
-                  At least 1 human player needed to start
-                </div>
-              )}
-            </>
+            <button
+              onClick={handleStartGame}
+              disabled={isStarting}
+              className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-primary text-primary-foreground rounded-xl text-base font-bold hover:opacity-90 transition-opacity shadow-glow disabled:opacity-50"
+            >
+              <Play size={18} /> {isStarting ? 'Starting…' : 'Start Game'}
+            </button>
           ) : (
-            <div className="text-center text-muted-foreground text-sm">
-              Waiting for host to start the game...
+            <div className="text-center text-muted-foreground text-sm py-2">
+              Waiting for host to start the game…
             </div>
           )}
 
           {error && (
             <div className="flex gap-2 text-destructive text-sm bg-destructive/10 rounded-lg px-3 py-2">
-              <AlertCircle size={16} className="flex-shrink-0 mt-0.5" />
+              <AlertCircle size={16} className="shrink-0 mt-0.5" />
               <span>{error}</span>
             </div>
           )}
