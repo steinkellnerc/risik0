@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMultiplayerStore } from '../game/multiplayerStore';
-import { Clock, Home, Sword, Square } from 'lucide-react';
+import { Clock, Home, Sword, Square, Target } from 'lucide-react';
 
 const PLAYER_BG = [
   'bg-player-1', 'bg-player-2', 'bg-player-3', 'bg-player-4', 'bg-player-5', 'bg-player-6',
@@ -10,8 +10,12 @@ const PLAYER_BG = [
 export default function MultiplayerStatusBar() {
   const {
     currentPlayerIndex, phase, turnNumber, players, territories,
-    reinforcementsLeft, winnerId, isMyTurn, mySlotIndex, disconnect,
+    reinforcementsLeft, winnerId, isMyTurn, mySlotIndex, disconnect, useMissions,
   } = useMultiplayerStore();
+
+  const myMission = useMissions
+    ? players.find(p => p.slotIndex === mySlotIndex)?.secretObjective ?? null
+    : null;
   const navigate = useNavigate();
   const [confirmLeave, setConfirmLeave] = useState(false);
 
@@ -47,7 +51,8 @@ export default function MultiplayerStatusBar() {
   const currentPlayer = players.find(p => p.slotIndex === currentPlayerIndex);
 
   return (
-    <div className="h-12 bg-surface flex items-center px-4 gap-3 shadow-elevated overflow-x-auto">
+    <div className="bg-surface shadow-elevated flex flex-col">
+    <div className="h-12 flex items-center px-4 gap-3 overflow-x-auto">
       {/* Home / leave button */}
       {confirmLeave ? (
         <div className="flex items-center gap-2 shrink-0">
@@ -112,6 +117,15 @@ export default function MultiplayerStatusBar() {
           <span className={`font-mono-tabular text-xs ${p.cards.length > 0 ? 'text-foreground' : 'text-muted-foreground/40'}`}>🃏{p.cards.length}</span>
         </div>
       ))}
+    </div>
+
+    {/* Secret mission — always visible on mobile below the status row */}
+    {myMission && (
+      <div className="md:hidden px-3 py-1.5 border-t border-border bg-muted/30 flex items-start gap-1.5">
+        <Target size={11} className="text-primary mt-0.5 shrink-0" />
+        <p className="text-xs text-foreground/80 leading-snug">{myMission}</p>
+      </div>
+    )}
     </div>
   );
 }
