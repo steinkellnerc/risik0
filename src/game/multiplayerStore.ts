@@ -227,6 +227,10 @@ export const useMultiplayerStore = create<MultiplayerGameState>((set, get) => ({
         const s = get();
         const newCurrentPlayer = game.current_player_index as number;
         const newIsMyTurn = s.mySlotIndex === newCurrentPlayer;
+        const turnChanged = newCurrentPlayer !== s.currentPlayerIndex;
+
+        // Look up reinforcements for the new current player from already-updated store
+        const nextPlayerData = s.players.find(p => p.slotIndex === newCurrentPlayer);
 
         set({
           status: game.status as string,
@@ -237,8 +241,9 @@ export const useMultiplayerStore = create<MultiplayerGameState>((set, get) => ({
           hasConqueredThisTurn: game.has_conquered_this_turn as boolean,
           winnerId: game.winner_id as string | null,
           isMyTurn: newIsMyTurn,
-          // Reset UI when turn changes
-          ...(newCurrentPlayer !== s.currentPlayerIndex ? {
+          // Always sync reinforcementsLeft on turn change so next player isn't stuck at 0
+          ...(turnChanged ? {
+            reinforcementsLeft: nextPlayerData?.armiesToPlace ?? 0,
             attackSource: null,
             attackTarget: null,
             fortifySource: null,
@@ -255,39 +260,46 @@ export const useMultiplayerStore = create<MultiplayerGameState>((set, get) => ({
           setTimeout(() => get().runAITurn(), 1000);
         }
       },
-      onPlayerUpdate: (dbPlayers) => {
+      onPlayerUpdate: (dbPlayer) => {
         const s = get();
+        const slotIndex = dbPlayer.slot_index as number;
         const missionMap = s.useMissions && s.gameId ? assignMissionsSeeded(s.gameId, 6) : {};
-        const players = dbPlayers.map((p: Record<string, unknown>) => ({
-          id: p.id as string,
-          slotIndex: p.slot_index as number,
-          displayName: p.display_name as string,
-          color: p.color as string,
-          userId: p.user_id as string | null,
-          isAi: p.is_ai as boolean,
-          armiesToPlace: p.armies_to_place as number,
-          eliminated: p.eliminated as boolean,
-          secretObjective: s.useMissions
-            ? (missionMap[p.slot_index as number]?.description ?? null)
-            : null,
-          cards: (p.cards as RiskCard[] || []) as RiskCard[],
-        }));
 
-        const currentPlayer = players.find(p => p.slotIndex === s.currentPlayerIndex);
-        set({
-          players,
-          reinforcementsLeft: s.isMyTurn ? (currentPlayer?.armiesToPlace ?? 0) : s.reinforcementsLeft,
-        });
-      },
-      onTerritoryUpdate: (dbTerritories) => {
-        const territories: Record<string, TerritoryState> = {};
-        for (const t of dbTerritories) {
-          territories[t.territory_id as string] = {
-            ownerId: t.owner_slot_index as number,
-            armies: t.army_count as number,
-          };
+        const updatedPlayer = {
+          id: dbPlayer.id as string,
+          slotIndex,
+          displayName: dbPlayer.display_name as string,
+          color: dbPlayer.color as string,
+          userId: dbPlayer.user_id as string | null,
+          isAi: dbPlayer.is_ai as boolean,
+          armiesToPlace: dbPlayer.armies_to_place as number,
+          eliminated: dbPlayer.eliminated as boolean,
+          secretObjective: s.useMissions ? (missionMap[slotIndex]?.description ?? null) : null,
+          cards: (dbPlayer.cards as RiskCard[] || []) as RiskCard[],
+        };
+
+        const players = s.players.map(p => p.slotIndex === slotIndex ? updatedPlayer : p);
+        // If player not yet in store (e.g. AI added mid-flow), append
+        if (!players.find(p => p.slotIndex === slotIndex)) players.push(updatedPlayer);
+
+        // Update reinforcementsLeft if this is the current player's data
+        const newState: Partial<typeof s> = { players };
+        if (slotIndex === s.currentPlayerIndex) {
+          newState.reinforcementsLeft = updatedPlayer.armiesToPlace;
         }
-        set({ territories });
+        set(newState);
+      },
+      onTerritoryUpdate: (dbTerritory) => {
+        const s = get();
+        set({
+          territories: {
+            ...s.territories,
+            [dbTerritory.territory_id as string]: {
+              ownerId: dbTerritory.owner_slot_index as number,
+              armies: dbTerritory.army_count as number,
+            },
+          },
+        });
       },
       onLogInsert: (entry) => {
         set(s => ({

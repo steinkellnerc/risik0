@@ -61,7 +61,7 @@ export default function MultiplayerGamePage() {
     return () => disconnect();
   }, [gameId, user, connect, disconnect]);
 
-  // Subscribe to player changes in lobby — fetch only players, don't full-reconnect
+  // Subscribe to player changes in lobby — merge single-row payload, no re-fetch
   useEffect(() => {
     if (!gameId || status !== 'LOBBY') return;
 
@@ -69,27 +69,26 @@ export default function MultiplayerGamePage() {
       .channel(`lobby-players:${gameId}`)
       .on('postgres_changes', {
         event: '*', schema: 'public', table: 'players', filter: `game_id=eq.${gameId}`
-      }, async () => {
-        const { data } = await supabase
-          .from('players')
-          .select('*')
-          .eq('game_id', gameId)
-          .order('slot_index');
-        if (!data) return;
-        const { myUserId: uid } = useMultiplayerStore.getState();
-        const mapped = data.map((p: Record<string, unknown>) => ({
+      }, (payload) => {
+        if (!payload.new || Object.keys(payload.new).length === 0) return;
+        const p = payload.new as Record<string, unknown>;
+        const slotIndex = p.slot_index as number;
+        const state = useMultiplayerStore.getState();
+        const updatedPlayer = {
           id: p.id as string,
-          slotIndex: p.slot_index as number,
+          slotIndex,
           displayName: p.display_name as string,
           color: p.color as string,
           userId: p.user_id as string | null,
           isAi: p.is_ai as boolean,
           armiesToPlace: p.armies_to_place as number,
           eliminated: p.eliminated as boolean,
-          secretObjective: (p.user_id === uid ? p.secret_objective : null) as string | null,
-          cards: [] as never[],
-        }));
-        useMultiplayerStore.setState({ players: mapped });
+          secretObjective: null,
+          cards: state.players.find(pl => pl.slotIndex === slotIndex)?.cards ?? [],
+        };
+        const players = state.players.map(pl => pl.slotIndex === slotIndex ? updatedPlayer : pl);
+        if (!players.find(pl => pl.slotIndex === slotIndex)) players.push(updatedPlayer);
+        useMultiplayerStore.setState({ players });
       })
       .subscribe();
 

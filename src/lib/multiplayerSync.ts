@@ -310,8 +310,8 @@ export function subscribeToGame(
   gameId: string,
   callbacks: {
     onGameUpdate: (game: Record<string, unknown>) => void;
-    onPlayerUpdate: (players: Record<string, unknown>[]) => void;
-    onTerritoryUpdate: (territories: Record<string, unknown>[]) => void;
+    onPlayerUpdate: (player: Record<string, unknown>) => void;
+    onTerritoryUpdate: (territory: Record<string, unknown>) => void;
     onLogInsert: (entry: Record<string, unknown>) => void;
   }
 ): RealtimeChannel {
@@ -325,26 +325,21 @@ export function subscribeToGame(
     .on(
       'postgres_changes',
       { event: '*', schema: 'public', table: 'players', filter: `game_id=eq.${gameId}` },
-      async () => {
-        // Re-fetch all players on any change
-        const { data } = await supabase
-          .from('players')
-          .select('*')
-          .eq('game_id', gameId)
-          .order('slot_index');
-        if (data) callbacks.onPlayerUpdate(data as unknown as Record<string, unknown>[]);
+      (payload) => {
+        // Use payload.new directly — no re-fetch, no race conditions
+        if (payload.new && Object.keys(payload.new).length > 0) {
+          callbacks.onPlayerUpdate(payload.new as Record<string, unknown>);
+        }
       }
     )
     .on(
       'postgres_changes',
       { event: '*', schema: 'public', table: 'territories', filter: `game_id=eq.${gameId}` },
-      async () => {
-        // Re-fetch all territories on any change
-        const { data } = await supabase
-          .from('territories')
-          .select('*')
-          .eq('game_id', gameId);
-        if (data) callbacks.onTerritoryUpdate(data as unknown as Record<string, unknown>[]);
+      (payload) => {
+        // Use payload.new directly — no re-fetch, no race conditions
+        if (payload.new && Object.keys(payload.new).length > 0) {
+          callbacks.onTerritoryUpdate(payload.new as Record<string, unknown>);
+        }
       }
     )
     .on(
