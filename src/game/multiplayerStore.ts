@@ -34,6 +34,7 @@ export interface MultiplayerGameState {
   gameId: string | null;
   myUserId: string | null;
   mySlotIndex: number | null;
+  hostUserId: string | null;
   isMyTurn: boolean;
   connected: boolean;
 
@@ -99,6 +100,7 @@ export const useMultiplayerStore = create<MultiplayerGameState>((set, get) => ({
   gameId: null,
   myUserId: null,
   mySlotIndex: null,
+  hostUserId: null,
   isMyTurn: false,
   connected: false,
 
@@ -141,6 +143,8 @@ export const useMultiplayerStore = create<MultiplayerGameState>((set, get) => ({
     const state = await fetchGameState(gameId);
     const myPlayer = state.players.find((p: Record<string, unknown>) => p.user_id === userId);
     const mySlot = myPlayer ? (myPlayer.slot_index as number) : null;
+    const hostPlayer = state.players.find((p: Record<string, unknown>) => p.slot_index === 0);
+    const hostUserId = (hostPlayer?.user_id as string | null) ?? null;
 
     // Convert territories from DB format
     const territories: Record<string, TerritoryState> = {};
@@ -182,6 +186,7 @@ export const useMultiplayerStore = create<MultiplayerGameState>((set, get) => ({
       gameId,
       myUserId: userId,
       mySlotIndex: mySlot,
+      hostUserId,
       isMyTurn,
       connected: true,
       status: state.game.status as string,
