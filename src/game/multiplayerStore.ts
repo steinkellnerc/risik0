@@ -24,8 +24,6 @@ import {
   updateGame,
   updatePlayer,
   addGameLog,
-  grantCard,
-  returnCards,
   subscribeToGame,
   unsubscribeFromGame,
 } from '../lib/multiplayerSync';
@@ -539,7 +537,6 @@ export const useMultiplayerStore = create<MultiplayerGameState>((set, get) => ({
     set({ players: updatedPlayers, reinforcementsLeft: newArmies, tradeInCount: s.tradeInCount + 1 });
 
     // Write to DB
-    await returnCards(cardIds);
     await updatePlayer(s.gameId, s.mySlotIndex, {
       cards: remainingCards,
       armies_to_place: newArmies,
@@ -560,24 +557,20 @@ export const useMultiplayerStore = create<MultiplayerGameState>((set, get) => ({
       await addGameLog(s.gameId, s.currentPlayerIndex, 'Attack phase', 'info');
       set({ phase: 'ATTACK', attackSource: null, attackTarget: null, lastDiceRoll: null });
     } else if (s.phase === 'ATTACK') {
-      // Grant a card if player conquered at least one territory this turn
-      if (s.hasConqueredThisTurn) {
-        const card = await grantCard(s.gameId, s.currentPlayerIndex);
-        if (card) {
-          const newCard: RiskCard = { id: card.id, type: card.type as RiskCard['type'], territoryId: card.territoryId ?? '' };
-          const updatedPlayers = s.players.map(p =>
-            p.slotIndex === s.currentPlayerIndex
-              ? { ...p, cards: [...p.cards, newCard] }
-              : p
-          );
-          set({ players: updatedPlayers });
-          // Persist cards to players table so they survive realtime updates
-          const myPlayer = updatedPlayers.find(p => p.slotIndex === s.currentPlayerIndex);
-          if (myPlayer) {
-            await updatePlayer(s.gameId, s.currentPlayerIndex, { cards: myPlayer.cards });
-          }
-          await addGameLog(s.gameId, s.currentPlayerIndex, 'Earned a Risk card', 'info');
-        }
+      // Grant a card if a human player conquered at least one territory this turn
+      const currentPlayer = s.players.find(p => p.slotIndex === s.currentPlayerIndex);
+      if (s.hasConqueredThisTurn && currentPlayer && !currentPlayer.isAi) {
+        const CARD_TYPES: RiskCard['type'][] = ['Infantry', 'Cavalry', 'Artillery'];
+        const type = CARD_TYPES[Math.floor(Math.random() * CARD_TYPES.length)];
+        const newCard: RiskCard = { id: crypto.randomUUID(), type, territoryId: '' };
+        const updatedPlayers = s.players.map(p =>
+          p.slotIndex === s.currentPlayerIndex ? { ...p, cards: [...p.cards, newCard] } : p
+        );
+        set({ players: updatedPlayers });
+        await updatePlayer(s.gameId, s.currentPlayerIndex, {
+          cards: updatedPlayers.find(p => p.slotIndex === s.currentPlayerIndex)!.cards,
+        });
+        await addGameLog(s.gameId, s.currentPlayerIndex, 'Earned a Risk card', 'info');
       }
       await updateGame(s.gameId, { turn_phase: 'FORTIFY' });
       await addGameLog(s.gameId, s.currentPlayerIndex, 'Fortify phase', 'info');
