@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useGameStore } from '../game/store';
 import { PLAYER_NAMES } from '../game/types';
-import { Home } from 'lucide-react';
+import { Home, Square } from 'lucide-react';
 
 const PLAYER_BG = [
   'bg-player-1', 'bg-player-2', 'bg-player-3', 'bg-player-4', 'bg-player-5', 'bg-player-6',
@@ -81,13 +81,10 @@ export default function StatusBar() {
           <span className="text-xs text-muted-foreground hidden lg:inline">
             {p.isAI ? '🤖' : ''}{p.name.split(' ')[0]}
           </span>
-          <span className="font-mono-tabular text-xs text-foreground" title="territories">{playerTerritories(i)}</span>
-          <span className="text-muted-foreground text-xs">⊡</span>
-          <span className="font-mono-tabular text-xs text-foreground" title="armies">{playerArmies(i)}</span>
-          <span className="text-muted-foreground text-xs">⚔</span>
-          {p.cards.length > 0 && (
-            <span className="font-mono-tabular text-xs text-muted-foreground">🃏{p.cards.length}</span>
-          )}
+          <span className="font-mono-tabular text-xs text-foreground">{playerTerritories(i)}</span>
+          <Square size={9} className="text-muted-foreground/60" />
+          <span className="font-mono-tabular text-xs text-foreground">{playerArmies(i)}</span>
+          <span className={`font-mono-tabular text-xs ${p.cards.length > 0 ? 'text-foreground' : 'text-muted-foreground/40'}`}>🃏{p.cards.length}</span>
         </div>
       ))}
     </div>
