@@ -98,54 +98,39 @@ export async function joinGame(
   userId: string,
   displayName: string
 ): Promise<number> {
-  // Find the next available slot
-  const { data: existingPlayers } = await supabase
+  // First: check if this user is already in the game (own row is always readable)
+  const { data: myRow } = await supabase
     .from('players')
-    .select('slot_index, user_id')
+    .select('slot_index')
     .eq('game_id', gameId)
-    .order('slot_index');
+    .eq('user_id', userId)
+    .single();
 
-  const takenSlots = new Set(existingPlayers?.map(p => p.slot_index) ?? []);
+  if (myRow) return myRow.slot_index;
 
-  // Check if user already joined (even if RLS blocks this, we can infer from the list)
-  const userAlreadyJoined = existingPlayers?.find(p => p.user_id === userId);
-  if (userAlreadyJoined) return userAlreadyJoined.slot_index;
-
-  let slotIndex = -1;
-  for (let i = 0; i < 6; i++) {
-    if (!takenSlots.has(i)) {
-      slotIndex = i;
-      break;
-    }
-  }
-  if (slotIndex === -1) throw new Error('Game is full');
-
-  const { error } = await supabase
-    .from('players')
-    .insert({
-      game_id: gameId,
-      user_id: userId,
-      slot_index: slotIndex,
-      display_name: displayName,
-      color: PLAYER_COLORS[slotIndex],
-      is_ai: false,
-    });
-
-  // If duplicate key error, re-fetch our own row to get the actual slot
-  if (error?.code === '23505') {
-    const { data: myRow } = await supabase
+  // Try slots 0–5 sequentially — resilient to RLS blocking reads of other players
+  for (let slot = 0; slot < 6; slot++) {
+    const { error } = await supabase
       .from('players')
-      .select('slot_index')
-      .eq('game_id', gameId)
-      .eq('user_id', userId)
-      .single();
-    return myRow?.slot_index ?? slotIndex;
+      .insert({
+        game_id: gameId,
+        user_id: userId,
+        slot_index: slot,
+        display_name: displayName,
+        color: PLAYER_COLORS[slot],
+        is_ai: false,
+      });
+
+    if (!error) {
+      await addGameLog(gameId, slot, `${displayName} joined the game`, 'info');
+      return slot;
+    }
+
+    if (error.code === '23505') continue; // Slot taken, try next
+    throw new Error(error.message);       // Unexpected error
   }
 
-  if (error) throw new Error(error.message);
-
-  await addGameLog(gameId, slotIndex, `${displayName} joined the game`, 'info');
-  return slotIndex;
+  throw new Error('Game is full');
 }
 
 // ==================== FILL AI SLOTS ====================
