@@ -430,29 +430,41 @@ export async function listOpenGames(currentUserId?: string): Promise<Array<{
 // ==================== GRANT CARD ====================
 
 export async function grantCard(gameId: string, playerSlotIndex: number): Promise<{ id: string; type: string; territoryId: string | null } | null> {
+  // Look up the player's UUID id from their slot index
+  const { data: player } = await supabase
+    .from('players')
+    .select('id')
+    .eq('game_id', gameId)
+    .eq('slot_index', playerSlotIndex)
+    .single();
+
+  if (!player) return null;
+
+  // Find an unowned card in the deck
   const { data: card } = await supabase
     .from('risk_cards')
-    .select('id, type, territory_id')
+    .select('id, card_type, territory_name')
     .eq('game_id', gameId)
-    .is('player_slot_index', null)
+    .is('player_id', null)
     .limit(1)
     .single();
 
   if (!card) return null;
 
+  // Assign the card to the player
   await supabase
     .from('risk_cards')
-    .update({ player_slot_index: playerSlotIndex })
+    .update({ player_id: player.id })
     .eq('id', card.id);
 
-  return { id: card.id as string, type: card.type as string, territoryId: card.territory_id as string | null };
+  return { id: card.id as string, type: card.card_type as string, territoryId: card.territory_name as string | null };
 }
 
 export async function returnCards(cardIds: string[]): Promise<void> {
   if (!cardIds.length) return;
   await supabase
     .from('risk_cards')
-    .update({ player_slot_index: null })
+    .update({ player_id: null })
     .in('id', cardIds);
 }
 
