@@ -10,6 +10,58 @@ function shuffleArray<T>(arr: T[]): T[] {
   return a;
 }
 
+// Seeded PRNG (mulberry32) — produces same sequence for same seed
+function mulberry32(seed: number) {
+  return function () {
+    let t = (seed += 0x6d2b79f5);
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function hashString(str: string): number {
+  let h = 0;
+  for (let i = 0; i < str.length; i++) {
+    h = Math.imul(31, h) + str.charCodeAt(i);
+    h |= 0;
+  }
+  return Math.abs(h);
+}
+
+/**
+ * Assign missions deterministically from a gameId seed.
+ * All clients derive identical results for the same gameId.
+ */
+export function assignMissionsSeeded(gameId: string, playerCount: number): Record<number, Mission> {
+  const rng = mulberry32(hashString(gameId));
+  const missions: Record<number, Mission> = {};
+
+  const pool: Mission[] = [
+    ...MISSIONS_POOL.map(m => ({ ...m })),
+  ];
+  for (let i = 0; i < playerCount; i++) {
+    pool.push({ ...DESTROY_PLAYER_MISSIONS[i], targetPlayerIndex: i });
+  }
+
+  // Seeded Fisher-Yates shuffle
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+
+  for (let p = 0; p < playerCount; p++) {
+    const idx = pool.findIndex(m => m.type !== 'destroy_player' || m.targetPlayerIndex !== p);
+    if (idx !== -1) {
+      missions[p] = pool.splice(idx, 1)[0];
+    } else {
+      missions[p] = { id: `fallback-${p}`, type: 'conquer_territories', description: 'Conquer 24 territories.', territoryCount: 24 };
+    }
+  }
+
+  return missions;
+}
+
 /**
  * Assign missions to 6 players.
  * Rules: A player cannot get "destroy yourself" mission.

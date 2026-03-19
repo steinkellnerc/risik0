@@ -16,7 +16,7 @@ import {
   checkWorldDomination,
   isPlayerEliminated,
 } from './gameEngine';
-import { checkMissionComplete, assignMissions } from './missions';
+import { checkMissionComplete, assignMissions, assignMissionsSeeded } from './missions';
 import { aiReinforce, aiDecideAttacks, aiFortify } from './ai';
 import {
   fetchGameState,
@@ -159,6 +159,10 @@ export const useMultiplayerStore = create<MultiplayerGameState>((set, get) => ({
       };
     }
 
+    // Compute missions client-side (deterministic from gameId — avoids RLS issues with DB writes)
+    const useMissionsFlag = state.game.use_missions as boolean;
+    const missionMap = useMissionsFlag ? assignMissionsSeeded(gameId, 6) : {};
+
     // Convert players from DB format
     const players = (state.players as Array<Record<string, unknown>>).map(p => ({
       id: p.id as string,
@@ -169,7 +173,9 @@ export const useMultiplayerStore = create<MultiplayerGameState>((set, get) => ({
       isAi: p.is_ai as boolean,
       armiesToPlace: p.armies_to_place as number,
       eliminated: p.eliminated as boolean,
-      secretObjective: (p.user_id === userId ? p.secret_objective : null) as string | null,
+      secretObjective: useMissionsFlag
+        ? (missionMap[p.slot_index as number]?.description ?? null)
+        : null,
       cards: (p.cards as RiskCard[] || []) as RiskCard[],
     }));
 
@@ -251,6 +257,7 @@ export const useMultiplayerStore = create<MultiplayerGameState>((set, get) => ({
       },
       onPlayerUpdate: (dbPlayers) => {
         const s = get();
+        const missionMap = s.useMissions && s.gameId ? assignMissionsSeeded(s.gameId, 6) : {};
         const players = dbPlayers.map((p: Record<string, unknown>) => ({
           id: p.id as string,
           slotIndex: p.slot_index as number,
@@ -260,7 +267,9 @@ export const useMultiplayerStore = create<MultiplayerGameState>((set, get) => ({
           isAi: p.is_ai as boolean,
           armiesToPlace: p.armies_to_place as number,
           eliminated: p.eliminated as boolean,
-          secretObjective: (p.user_id === s.myUserId ? p.secret_objective : null) as string | null,
+          secretObjective: s.useMissions
+            ? (missionMap[p.slot_index as number]?.description ?? null)
+            : null,
           cards: (p.cards as RiskCard[] || []) as RiskCard[],
         }));
 
