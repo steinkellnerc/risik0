@@ -244,15 +244,21 @@ export default function MultiplayerActionPanel() {
         </div>
       )}
 
-      {/* Cards */}
-      {myPlayer && (
+      {/* Cards — full panel on my turn, compact count otherwise */}
+      {myPlayer && isMyTurn && (
         <CardsPanel
           cards={myPlayer.cards ?? []}
-          phase={isMyTurn ? phase : 'WAITING'}
+          phase={phase}
           selectedCardIds={selectedCardIds}
           setSelectedCardIds={setSelectedCardIds}
           onTrade={async (ids) => { await tradeInCards(ids); setSelectedCardIds([]); }}
         />
+      )}
+      {myPlayer && !isMyTurn && (myPlayer.cards ?? []).length > 0 && (
+        <div className="px-3 py-1.5 border-b border-border flex items-center gap-1.5 text-muted-foreground">
+          <ScrollText size={11} />
+          <span className="text-xs">🃏{myPlayer.cards.length} cards</span>
+        </div>
       )}
 
       {/* Phase actions */}

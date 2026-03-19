@@ -109,9 +109,7 @@ export default function MultiplayerStatusBar() {
           <span className="font-mono-tabular text-xs text-foreground">{playerTerritories(p.slotIndex)}</span>
           <Square size={9} className="text-muted-foreground/60" />
           <span className="font-mono-tabular text-xs text-foreground">{playerArmies(p.slotIndex)}</span>
-          {p.cards.length > 0 && (
-            <span className="font-mono-tabular text-xs text-muted-foreground">🃏{p.cards.length}</span>
-          )}
+          <span className={`font-mono-tabular text-xs ${p.cards.length > 0 ? 'text-foreground' : 'text-muted-foreground/40'}`}>🃏{p.cards.length}</span>
         </div>
       ))}
     </div>
