@@ -61,21 +61,40 @@ export default function MultiplayerGamePage() {
     return () => disconnect();
   }, [gameId, user, connect, disconnect]);
 
-  // Subscribe to player changes in lobby
+  // Subscribe to player changes in lobby — fetch only players, don't full-reconnect
   useEffect(() => {
     if (!gameId || status !== 'LOBBY') return;
 
     const channel = supabase
-      .channel(`lobby:${gameId}`)
+      .channel(`lobby-players:${gameId}`)
       .on('postgres_changes', {
         event: '*', schema: 'public', table: 'players', filter: `game_id=eq.${gameId}`
-      }, () => {
-        if (user) connect(gameId, user.id);
+      }, async () => {
+        const { data } = await supabase
+          .from('players')
+          .select('*')
+          .eq('game_id', gameId)
+          .order('slot_index');
+        if (!data) return;
+        const { myUserId: uid } = useMultiplayerStore.getState();
+        const mapped = data.map((p: Record<string, unknown>) => ({
+          id: p.id as string,
+          slotIndex: p.slot_index as number,
+          displayName: p.display_name as string,
+          color: p.color as string,
+          userId: p.user_id as string | null,
+          isAi: p.is_ai as boolean,
+          armiesToPlace: p.armies_to_place as number,
+          eliminated: p.eliminated as boolean,
+          secretObjective: (p.user_id === uid ? p.secret_objective : null) as string | null,
+          cards: [] as never[],
+        }));
+        useMultiplayerStore.setState({ players: mapped });
       })
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, [gameId, status, user, connect]);
+  }, [gameId, status]);
 
   const handleLeave = () => {
     disconnect();
@@ -85,14 +104,11 @@ export default function MultiplayerGamePage() {
   const handleDeleteGame = async () => {
     if (!gameId) return;
     setIsDeleting(true);
-    try {
-      disconnect();
-      await cancelGame(gameId);
-      navigate('/lobby');
-    } catch {
-      setIsDeleting(false);
-      setError('Failed to delete game');
-    }
+    // Navigate away first so the user isn't stuck on a broken screen
+    disconnect();
+    navigate('/lobby');
+    // Cancel in background — best effort
+    cancelGame(gameId).catch(err => console.error('Cancel game failed:', err));
   };
 
   const handleStartGame = async () => {
