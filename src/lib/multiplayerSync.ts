@@ -427,6 +427,69 @@ export async function listOpenGames(currentUserId?: string): Promise<Array<{
   return results;
 }
 
+// ==================== GRANT CARD ====================
+
+export async function grantCard(gameId: string, playerSlotIndex: number): Promise<{ type: string; territoryId: string | null } | null> {
+  const { data: card } = await supabase
+    .from('risk_cards')
+    .select('id, type, territory_id')
+    .eq('game_id', gameId)
+    .is('player_slot_index', null)
+    .limit(1)
+    .single();
+
+  if (!card) return null;
+
+  await supabase
+    .from('risk_cards')
+    .update({ player_slot_index: playerSlotIndex })
+    .eq('id', card.id);
+
+  return { type: card.type as string, territoryId: card.territory_id as string | null };
+}
+
+// ==================== LIST ACTIVE GAMES FOR USER ====================
+
+export async function listMyActiveGames(userId: string): Promise<Array<{
+  id: string;
+  playerCount: number;
+  useMissions: boolean;
+  turnNumber: number;
+}>> {
+  const { data: playerRows } = await supabase
+    .from('players')
+    .select('game_id')
+    .eq('user_id', userId)
+    .eq('is_ai', false);
+
+  if (!playerRows?.length) return [];
+
+  const gameIds = playerRows.map(r => r.game_id as string);
+  const { data: games } = await supabase
+    .from('games')
+    .select('id, use_missions, turn_number')
+    .eq('status', 'ACTIVE')
+    .in('id', gameIds);
+
+  if (!games?.length) return [];
+
+  const results = [];
+  for (const g of games) {
+    const { count } = await supabase
+      .from('players')
+      .select('*', { count: 'exact', head: true })
+      .eq('game_id', g.id)
+      .eq('is_ai', false);
+    results.push({
+      id: g.id as string,
+      playerCount: count ?? 0,
+      useMissions: (g.use_missions as boolean) ?? false,
+      turnNumber: (g.turn_number as number) ?? 1,
+    });
+  }
+  return results;
+}
+
 // ==================== CANCEL GAME ====================
 
 export async function cancelGame(gameId: string): Promise<void> {

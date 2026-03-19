@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
-import { createGame, listOpenGames, joinGame, cancelGame } from '../lib/multiplayerSync';
+import { createGame, listOpenGames, listMyActiveGames, joinGame, cancelGame } from '../lib/multiplayerSync';
 import { LogOut, Plus, Users, RefreshCw, Gamepad2, Target, Crown, Trash2 } from 'lucide-react';
 
 type GameEntry = {
@@ -18,6 +18,7 @@ export default function LobbyPage() {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const [games, setGames] = useState<GameEntry[]>([]);
+  const [activeGames, setActiveGames] = useState<Array<{ id: string; playerCount: number; useMissions: boolean; turnNumber: number }>>([]);
   const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
   const [useMissions, setUseMissions] = useState(true);
@@ -28,8 +29,12 @@ export default function LobbyPage() {
   const refreshGames = async () => {
     setLoading(true);
     try {
-      const result = await listOpenGames(user?.id);
-      setGames(result);
+      const [open, active] = await Promise.all([
+        listOpenGames(user?.id),
+        user?.id ? listMyActiveGames(user.id) : Promise.resolve([]),
+      ]);
+      setGames(open);
+      setActiveGames(active);
     } catch {
       // ignore
     } finally {
@@ -155,6 +160,32 @@ export default function LobbyPage() {
                       Open
                     </button>
                   </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Active / in-progress games */}
+          {activeGames.length > 0 && (
+            <div className="bg-surface rounded-xl p-4 space-y-2 shadow-elevated">
+              <span className="text-sm font-semibold text-foreground flex items-center gap-2">
+                <RefreshCw size={14} className="text-green-400" /> In Progress
+              </span>
+              {activeGames.map(game => (
+                <div key={game.id} className="flex items-center justify-between px-3 py-2.5 rounded-lg bg-green-500/10 border border-green-500/20">
+                  <div className="flex flex-col gap-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-foreground font-medium">Round {Math.floor((game.turnNumber - 1) / 6) + 1}</span>
+                      <ModeTag useMissions={game.useMissions} />
+                      <span className="text-xs text-muted-foreground">{game.playerCount} players</span>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => navigate(`/game/${game.id}`)}
+                    className="px-3 py-1.5 bg-green-600 text-white rounded-md text-xs font-semibold hover:opacity-90 transition-opacity"
+                  >
+                    Resume
+                  </button>
                 </div>
               ))}
             </div>

@@ -24,6 +24,7 @@ import {
   updateGame,
   updatePlayer,
   addGameLog,
+  grantCard,
   subscribeToGame,
   unsubscribeFromGame,
 } from '../lib/multiplayerSync';
@@ -333,6 +334,11 @@ export const useMultiplayerStore = create<MultiplayerGameState>((set, get) => ({
       armies_to_place: s.reinforcementsLeft - 1,
     });
     await addGameLog(s.gameId, s.currentPlayerIndex, `Reinforced ${territoryId}`, 'reinforce');
+
+    // Auto-advance to attack phase when all reinforcements placed
+    if (s.reinforcementsLeft - 1 === 0) {
+      await get().endPhase();
+    }
   },
 
   // ==================== ATTACK SELECTION ====================
@@ -431,10 +437,16 @@ export const useMultiplayerStore = create<MultiplayerGameState>((set, get) => ({
     const t = TERRITORY_MAP.get(captured);
     if (!t) return;
 
-    const sourceId = t.adjacent.find(a =>
-      s.territories[a]?.ownerId === s.currentPlayerIndex && s.territories[a]?.armies > 1
-    );
-    if (!sourceId) return;
+    // Find adjacent owned territory with armies to spare (prefer most armies)
+    const sourceId = t.adjacent
+      .filter(a => s.territories[a]?.ownerId === s.currentPlayerIndex && s.territories[a]?.armies > 1)
+      .sort((a, b) => s.territories[b].armies - s.territories[a].armies)[0];
+    if (!sourceId) {
+      // No source available — set 1 army on captured territory as minimum
+      set({ territories: { ...s.territories, [captured]: { ...s.territories[captured], armies: 1 } }, capturedTerritory: null, awaitingMoveIn: false });
+      await updateTerritory(s.gameId, captured, { army_count: 1 });
+      return;
+    }
 
     const sourceState = s.territories[sourceId];
     const maxMove = sourceState.armies - 1;
@@ -515,6 +527,19 @@ export const useMultiplayerStore = create<MultiplayerGameState>((set, get) => ({
       await addGameLog(s.gameId, s.currentPlayerIndex, 'Attack phase', 'info');
       set({ phase: 'ATTACK', attackSource: null, attackTarget: null, lastDiceRoll: null });
     } else if (s.phase === 'ATTACK') {
+      // Grant a card if player conquered at least one territory this turn
+      if (s.hasConqueredThisTurn) {
+        const card = await grantCard(s.gameId, s.currentPlayerIndex);
+        if (card) {
+          const updatedPlayers = s.players.map(p =>
+            p.slotIndex === s.currentPlayerIndex
+              ? { ...p, cards: [...p.cards, { type: card.type as RiskCard['type'], territoryId: card.territoryId ?? '' }] }
+              : p
+          );
+          set({ players: updatedPlayers });
+          await addGameLog(s.gameId, s.currentPlayerIndex, 'Earned a Risk card', 'info');
+        }
+      }
       await updateGame(s.gameId, { turn_phase: 'FORTIFY' });
       await addGameLog(s.gameId, s.currentPlayerIndex, 'Fortify phase', 'info');
       set({ phase: 'FORTIFY', fortifySource: null, fortifyTarget: null, attackSource: null, attackTarget: null });
