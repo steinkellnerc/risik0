@@ -1,4 +1,5 @@
 import { motion } from 'framer-motion';
+import { useRef, useState, useEffect, useCallback } from 'react';
 import { useGameStore } from '../game/store';
 import { useMultiplayerStore } from '../game/multiplayerStore';
 import { TERRITORIES, TERRITORY_MAP, CONTINENT_COLORS, CONTINENTS } from '../game/mapData';
@@ -170,10 +171,119 @@ export default function GameMap({ multiplayer = false }: { multiplayer?: boolean
     }
   };
 
+  const svgRef = useRef<SVGSVGElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [transform, setTransform] = useState({ x: 0, y: 0, scale: 1 });
+  const dragRef = useRef({ dragging: false, startX: 0, startY: 0, moved: false });
+  const lastTouchDist = useRef(0);
+  const lastTouchMid = useRef({ x: 0, y: 0 });
+
+  const clampTransform = useCallback((x: number, y: number, scale: number) => {
+    const s = Math.max(0.6, Math.min(4, scale));
+    return { x, y, scale: s };
+  }, []);
+
+  // Wheel zoom (toward cursor)
+  const handleWheel = useCallback((e: WheelEvent) => {
+    e.preventDefault();
+    const rect = containerRef.current!.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    setTransform(t => {
+      const factor = e.deltaY < 0 ? 1.12 : 0.88;
+      const newScale = Math.max(0.6, Math.min(4, t.scale * factor));
+      const sf = newScale / t.scale;
+      return clampTransform(mx - sf * (mx - t.x), my - sf * (my - t.y), newScale);
+    });
+  }, [clampTransform]);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    el.addEventListener('wheel', handleWheel, { passive: false });
+    return () => el.removeEventListener('wheel', handleWheel);
+  }, [handleWheel]);
+
+  // Mouse drag
+  const handleMouseDown = (e: React.MouseEvent) => {
+    dragRef.current = { dragging: true, startX: e.clientX, startY: e.clientY, moved: false };
+  };
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!dragRef.current.dragging) return;
+    const dx = e.clientX - dragRef.current.startX;
+    const dy = e.clientY - dragRef.current.startY;
+    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) dragRef.current.moved = true;
+    dragRef.current.startX = e.clientX;
+    dragRef.current.startY = e.clientY;
+    setTransform(t => clampTransform(t.x + dx, t.y + dy, t.scale));
+  };
+  const handleMouseUp = () => { dragRef.current.dragging = false; };
+
+  // Touch: pinch zoom + drag
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 2) {
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      lastTouchDist.current = Math.hypot(dx, dy);
+      lastTouchMid.current = {
+        x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
+        y: (e.touches[0].clientY + e.touches[1].clientY) / 2,
+      };
+    } else if (e.touches.length === 1) {
+      dragRef.current = { dragging: true, startX: e.touches[0].clientX, startY: e.touches[0].clientY, moved: false };
+    }
+  };
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (e.touches.length === 2) {
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      const dist = Math.hypot(dx, dy);
+      const mid = {
+        x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
+        y: (e.touches[0].clientY + e.touches[1].clientY) / 2,
+      };
+      const rect = containerRef.current!.getBoundingClientRect();
+      const mx = mid.x - rect.left;
+      const my = mid.y - rect.top;
+      const factor = dist / lastTouchDist.current;
+      lastTouchDist.current = dist;
+      lastTouchMid.current = mid;
+      setTransform(t => {
+        const newScale = Math.max(0.6, Math.min(4, t.scale * factor));
+        const sf = newScale / t.scale;
+        return clampTransform(mx - sf * (mx - t.x), my - sf * (my - t.y), newScale);
+      });
+    } else if (e.touches.length === 1 && dragRef.current.dragging) {
+      const dx = e.touches[0].clientX - dragRef.current.startX;
+      const dy = e.touches[0].clientY - dragRef.current.startY;
+      if (Math.abs(dx) > 3 || Math.abs(dy) > 3) dragRef.current.moved = true;
+      dragRef.current.startX = e.touches[0].clientX;
+      dragRef.current.startY = e.touches[0].clientY;
+      setTransform(t => clampTransform(t.x + dx, t.y + dy, t.scale));
+    }
+  };
+  const handleTouchEnd = () => { dragRef.current.dragging = false; };
+
   return (
-    <div className="w-full h-full flex items-center justify-center overflow-hidden">
-      <svg viewBox="0 0 960 520" className="w-full h-full max-h-[calc(100vh-4rem)]" preserveAspectRatio="xMidYMid meet">
-        {/* Background */}
+    <div
+      ref={containerRef}
+      className="w-full h-full overflow-hidden select-none"
+      style={{ cursor: dragRef.current.dragging ? 'grabbing' : 'grab' }}
+      onMouseDown={handleMouseDown}
+      onMouseMove={handleMouseMove}
+      onMouseUp={handleMouseUp}
+      onMouseLeave={handleMouseUp}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+    >
+      <svg
+        ref={svgRef}
+        viewBox="0 0 960 520"
+        className="w-full h-full"
+        preserveAspectRatio="xMidYMid meet"
+      >
+        {/* Background — outside transform so it always fills */}
         <rect width="960" height="520" fill="hsl(222, 47%, 3%)" />
 
         {/* Classic Risk board — place risk-board.jpg in /public to enable */}
@@ -188,73 +298,76 @@ export default function GameMap({ multiplayer = false }: { multiplayer?: boolean
         </defs>
         <rect width="960" height="520" fill="url(#grid)" />
 
-        {/* Continent background regions */}
-        {Object.entries(CONTINENT_COLORS).map(([cid, color]) => {
-          const cTerritories = TERRITORIES.filter(t => t.continentId === cid);
-          const xs = cTerritories.map(t => t.cx);
-          const ys = cTerritories.map(t => t.cy);
-          const minX = Math.min(...xs) - 35;
-          const minY = Math.min(...ys) - 30;
-          const maxX = Math.max(...xs) + 35;
-          const maxY = Math.max(...ys) + 30;
-          return (
-            <rect key={cid} x={minX} y={minY} width={maxX - minX} height={maxY - minY}
-              rx="8" fill={color} opacity="0.5" />
-          );
-        })}
+        {/* All map content — panned and zoomed */}
+        <g transform={`translate(${transform.x},${transform.y}) scale(${transform.scale})`}>
+          {/* Continent background regions */}
+          {Object.entries(CONTINENT_COLORS).map(([cid, color]) => {
+            const cTerritories = TERRITORIES.filter(t => t.continentId === cid);
+            const xs = cTerritories.map(t => t.cx);
+            const ys = cTerritories.map(t => t.cy);
+            const minX = Math.min(...xs) - 35;
+            const minY = Math.min(...ys) - 30;
+            const maxX = Math.max(...xs) + 35;
+            const maxY = Math.max(...ys) + 30;
+            return (
+              <rect key={cid} x={minX} y={minY} width={maxX - minX} height={maxY - minY}
+                rx="8" fill={color} opacity="0.5" />
+            );
+          })}
 
-        <ConnectionLines />
+          <ConnectionLines />
 
-        {/* Continent borders */}
-        <ContinentBorders />
+          {/* Continent borders */}
+          <ContinentBorders />
 
-        {/* Continent bonus table */}
-        <ContinentBonusTable />
+          {/* Continent bonus table */}
+          <ContinentBonusTable />
 
-        {/* Territories */}
-        {TERRITORIES.map(t => {
-          const state = territories[t.id];
-          if (!state) return null;
-          const color = PLAYER_HSL[state.ownerId];
-          const dimColor = PLAYER_HSL_DIM[state.ownerId];
-          const isSource = attackSource === t.id || fortifySource === t.id;
-          const isTarget = attackTarget === t.id;
-          const isOwned = state.ownerId === currentPlayerIndex;
-          // Highlight potential attack sources when target is selected but no source yet
-          const isPotentialSource = phase === 'ATTACK' && !attackSource && !!attackTarget &&
-            isOwned && state.armies >= 2 && t.adjacent.includes(attackTarget);
-          const canInteract = isReadOnly ? false :
-            phase === 'REINFORCE' ? isOwned :
-            phase === 'ATTACK' ? true :
-            phase === 'FORTIFY' ? isOwned : false;
+          {/* Territories */}
+          {TERRITORIES.map(t => {
+            const state = territories[t.id];
+            if (!state) return null;
+            const color = PLAYER_HSL[state.ownerId];
+            const dimColor = PLAYER_HSL_DIM[state.ownerId];
+            const isSource = attackSource === t.id || fortifySource === t.id;
+            const isTarget = attackTarget === t.id;
+            const isOwned = state.ownerId === currentPlayerIndex;
+            // Highlight potential attack sources when target is selected but no source yet
+            const isPotentialSource = phase === 'ATTACK' && !attackSource && !!attackTarget &&
+              isOwned && state.armies >= 2 && t.adjacent.includes(attackTarget);
+            const canInteract = isReadOnly ? false :
+              phase === 'REINFORCE' ? isOwned :
+              phase === 'ATTACK' ? true :
+              phase === 'FORTIFY' ? isOwned : false;
 
-          return (
-            <g key={t.id} onClick={() => handleTerritoryClick(t.id)}
-              className={canInteract ? 'cursor-pointer' : 'cursor-default'}>
-              {/* Territory circle */}
-              <motion.circle
-                cx={t.cx} cy={t.cy} r={isSource ? 20 : isPotentialSource ? 19 : 16}
-                fill={dimColor}
-                stroke={isSource ? color : isTarget ? 'hsl(0, 84%, 60%)' : isPotentialSource ? 'hsl(48, 96%, 53%)' : color}
-                strokeWidth={isSource || isTarget || isPotentialSource ? 2.5 : 1.2}
-                opacity={0.9}
-                whileHover={canInteract ? { scale: 1.15 } : {}}
-                transition={{ duration: 0.15 }}
-                className={isSource || isPotentialSource ? 'animate-pulse-territory' : ''}
-              />
-              {/* Army count */}
-              <text x={t.cx} y={t.cy + 1} textAnchor="middle" dominantBaseline="middle"
-                fill="white" fontSize="15" fontFamily="IBM Plex Mono, monospace" fontWeight="700">
-                {state.armies}
-              </text>
-              {/* Territory name */}
-              <text x={t.cx} y={t.cy + 28} textAnchor="middle" dominantBaseline="middle"
-                fill="hsl(210, 20%, 65%)" fontSize="8.5" fontFamily="IBM Plex Sans, sans-serif" fontWeight="500">
-                {t.name}
-              </text>
-            </g>
-          );
-        })}
+            return (
+              <g key={t.id} onClick={() => !dragRef.current.moved && handleTerritoryClick(t.id)}
+                className={canInteract ? 'cursor-pointer' : 'cursor-default'}>
+                {/* Territory circle */}
+                <motion.circle
+                  cx={t.cx} cy={t.cy} r={isSource ? 20 : isPotentialSource ? 19 : 16}
+                  fill={dimColor}
+                  stroke={isSource ? color : isTarget ? 'hsl(0, 84%, 60%)' : isPotentialSource ? 'hsl(48, 96%, 53%)' : color}
+                  strokeWidth={isSource || isTarget || isPotentialSource ? 2.5 : 1.2}
+                  opacity={0.9}
+                  whileHover={canInteract ? { scale: 1.15 } : {}}
+                  transition={{ duration: 0.15 }}
+                  className={isSource || isPotentialSource ? 'animate-pulse-territory' : ''}
+                />
+                {/* Army count */}
+                <text x={t.cx} y={t.cy + 1} textAnchor="middle" dominantBaseline="middle"
+                  fill="white" fontSize="15" fontFamily="IBM Plex Mono, monospace" fontWeight="700">
+                  {state.armies}
+                </text>
+                {/* Territory name */}
+                <text x={t.cx} y={t.cy + 28} textAnchor="middle" dominantBaseline="middle"
+                  fill="hsl(210, 20%, 65%)" fontSize="8.5" fontFamily="IBM Plex Sans, sans-serif" fontWeight="500">
+                  {t.name}
+                </text>
+              </g>
+            );
+          })}
+        </g>
       </svg>
     </div>
   );
