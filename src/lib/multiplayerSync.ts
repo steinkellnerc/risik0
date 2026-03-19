@@ -430,9 +430,11 @@ export async function listOpenGames(currentUserId?: string): Promise<Array<{
 // ==================== CANCEL GAME ====================
 
 export async function cancelGame(gameId: string): Promise<void> {
-  const { error } = await supabase
+  const { error, data } = await supabase
     .from('games')
     .update({ status: 'CANCELLED' })
-    .eq('id', gameId);
+    .eq('id', gameId)
+    .select();
+  console.log('[cancelGame]', { gameId, data, error });
   if (error) throw new Error(error.message);
 }

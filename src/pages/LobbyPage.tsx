@@ -70,7 +70,13 @@ export default function LobbyPage() {
 
   const handleDeleteGame = async (gameId: string) => {
     setGames(prev => prev.filter(g => g.id !== gameId));
-    cancelGame(gameId).catch(() => refreshGames());
+    try {
+      await cancelGame(gameId);
+    } catch (err) {
+      console.error('Delete failed:', err);
+      setError(err instanceof Error ? err.message : 'Failed to delete game');
+      await refreshGames(); // restore list if delete failed
+    }
   };
 
   const myGames = games.filter(g => g.hostUserId === user?.id);
