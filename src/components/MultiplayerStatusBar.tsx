@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMultiplayerStore } from '../game/multiplayerStore';
-import { Clock, Home } from 'lucide-react';
+import { Clock, Home, Sword, Square } from 'lucide-react';
 
 const PLAYER_BG = [
   'bg-player-1', 'bg-player-2', 'bg-player-3', 'bg-player-4', 'bg-player-5', 'bg-player-6',
@@ -99,16 +99,22 @@ export default function MultiplayerStatusBar() {
 
       {/* Player indicators */}
       {players.map((p) => (
-        <div key={p.slotIndex} className={`flex items-center gap-1.5 px-2 py-1 rounded-md transition-all duration-150 ${
+        <div key={p.slotIndex} className={`flex items-center gap-1 px-2 py-1 rounded-md transition-all duration-150 shrink-0 ${
           p.slotIndex === currentPlayerIndex ? 'bg-secondary shadow-surface' : ''
         } ${p.eliminated ? 'opacity-30' : ''} ${p.slotIndex === mySlotIndex ? 'ring-1 ring-primary/30' : ''}`}>
-          <div className={`w-2.5 h-2.5 rounded-full ${PLAYER_BG[p.slotIndex]}`} />
+          <div className={`w-2.5 h-2.5 rounded-full ${PLAYER_BG[p.slotIndex]} shrink-0`} />
           <span className="text-xs text-muted-foreground hidden lg:inline">
             {p.isAi ? 'AI ' : ''}{p.displayName.split(' ')[0]}
           </span>
           <span className="font-mono-tabular text-xs text-foreground">{playerTerritories(p.slotIndex)}</span>
-          <span className="text-muted-foreground text-xs">/</span>
+          <Square size={9} className="text-muted-foreground/60" />
           <span className="font-mono-tabular text-xs text-foreground">{playerArmies(p.slotIndex)}</span>
+          {p.cards.length > 0 && (
+            <>
+              <span className="text-muted-foreground/60 text-xs">×</span>
+              <span className="font-mono-tabular text-xs text-foreground">{p.cards.length}</span>
+            </>
+          )}
         </div>
       ))}
     </div>

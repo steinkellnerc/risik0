@@ -172,7 +172,7 @@ export const useMultiplayerStore = create<MultiplayerGameState>((set, get) => ({
       armiesToPlace: p.armies_to_place as number,
       eliminated: p.eliminated as boolean,
       secretObjective: (p.user_id === userId ? p.secret_objective : null) as string | null,
-      cards: (p.user_id === userId ? (p.cards as RiskCard[] || []) : []) as RiskCard[],
+      cards: (p.cards as RiskCard[] || []) as RiskCard[],
     }));
 
     const currentPlayerIndex = state.game.current_player_index as number;
@@ -263,7 +263,7 @@ export const useMultiplayerStore = create<MultiplayerGameState>((set, get) => ({
           armiesToPlace: p.armies_to_place as number,
           eliminated: p.eliminated as boolean,
           secretObjective: (p.user_id === s.myUserId ? p.secret_objective : null) as string | null,
-          cards: (p.user_id === s.myUserId ? (p.cards as RiskCard[] || []) : []) as RiskCard[],
+          cards: (p.cards as RiskCard[] || []) as RiskCard[],
         }));
 
         const currentPlayer = players.find(p => p.slotIndex === s.currentPlayerIndex);
