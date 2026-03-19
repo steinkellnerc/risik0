@@ -2,7 +2,139 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useMultiplayerStore } from '../game/multiplayerStore';
 import { TERRITORY_MAP } from '../game/mapData';
-import { Swords, Shield, Move, ChevronRight, Dices, Target, Clock, History, Coins } from 'lucide-react';
+import type { RiskCard } from '../game/types';
+import { Swords, Shield, Move, ChevronRight, Dices, Target, Clock, History, ScrollText } from 'lucide-react';
+
+function isValidSet(cards: RiskCard[]): boolean {
+  if (cards.length !== 3) return false;
+  const types = cards.map(c => c.type);
+  const wilds = types.filter(t => t === 'Wild').length;
+  const nonWild = types.filter(t => t !== 'Wild');
+  if (wilds >= 2) return true;
+  if (wilds === 1) return true;
+  if (nonWild[0] === nonWild[1] && nonWild[1] === nonWild[2]) return true;
+  if (new Set(nonWild).size === 3) return true;
+  return false;
+}
+
+function findValidSet(cards: RiskCard[]): RiskCard[] | null {
+  for (let i = 0; i < cards.length - 2; i++)
+    for (let j = i + 1; j < cards.length - 1; j++)
+      for (let k = j + 1; k < cards.length; k++) {
+        const combo = [cards[i], cards[j], cards[k]];
+        if (isValidSet(combo)) return combo;
+      }
+  return null;
+}
+
+const CARD_LABELS: Record<string, string> = {
+  Infantry: '⚔ Infantry',
+  Cavalry: '🐴 Cavalry',
+  Artillery: '💣 Artillery',
+  Wild: '★ Wild',
+};
+
+function CardsPanel({
+  cards, phase, selectedCardIds, setSelectedCardIds, onTrade,
+}: {
+  cards: RiskCard[];
+  phase: string;
+  selectedCardIds: string[];
+  setSelectedCardIds: (ids: string[]) => void;
+  onTrade: (ids: string[]) => void;
+}) {
+  const mustTrade = cards.length >= 5;
+  const selectedCards = cards.filter(c => selectedCardIds.includes(c.id));
+  const canTrade = selectedCards.length === 3 && isValidSet(selectedCards);
+  const canSelect = phase === 'REINFORCE';
+  const bestSet = mustTrade ? findValidSet(cards) : null;
+
+  const toggleCard = (id: string) => {
+    if (!canSelect) return;
+    if (selectedCardIds.includes(id)) {
+      setSelectedCardIds(selectedCardIds.filter(s => s !== id));
+    } else if (selectedCardIds.length < 3) {
+      setSelectedCardIds([...selectedCardIds, id]);
+    }
+  };
+
+  return (
+    <div className={`px-4 py-2 border-b border-border ${mustTrade ? 'bg-destructive/10' : 'bg-muted/20'}`}>
+      <div className="flex items-center justify-between mb-1.5">
+        <div className="flex items-center gap-1.5 text-muted-foreground">
+          <ScrollText size={12} />
+          <span className="text-xs font-semibold">CARDS ({cards.length})</span>
+        </div>
+        {mustTrade && (
+          <span className="text-xs font-bold text-destructive animate-pulse">MUST TRADE</span>
+        )}
+      </div>
+
+      {cards.length === 0 ? (
+        <p className="text-xs text-muted-foreground/60">No cards yet — earn one by conquering a territory.</p>
+      ) : (
+        <>
+          <div className="flex flex-wrap gap-1 mb-2">
+            {cards.map(card => {
+              const isSelected = selectedCardIds.includes(card.id);
+              const isInBestSet = bestSet?.some(c => c.id === card.id) ?? false;
+              const isDisabled = !isSelected && selectedCardIds.length >= 3;
+              return (
+                <button
+                  key={card.id}
+                  onClick={() => toggleCard(card.id)}
+                  disabled={!canSelect || isDisabled}
+                  className={`px-2 py-0.5 rounded text-xs font-medium border transition-all ${
+                    isSelected
+                      ? 'bg-primary text-primary-foreground border-primary'
+                      : mustTrade && isInBestSet && selectedCardIds.length === 0
+                      ? 'bg-destructive/20 text-foreground border-destructive/60 cursor-pointer'
+                      : canSelect && !isDisabled
+                      ? 'bg-secondary text-foreground border-border hover:border-primary/60 cursor-pointer'
+                      : 'bg-secondary text-muted-foreground border-border opacity-70'
+                  }`}
+                >
+                  {CARD_LABELS[card.type]}
+                </button>
+              );
+            })}
+          </div>
+
+          {mustTrade && bestSet && selectedCardIds.length === 0 && (
+            <button
+              onClick={() => onTrade(bestSet.map(c => c.id))}
+              className="w-full px-3 py-1.5 bg-destructive text-destructive-foreground rounded-md text-xs font-medium hover:opacity-90 transition-opacity"
+            >
+              Trade Best Set (required)
+            </button>
+          )}
+
+          {canSelect && selectedCardIds.length > 0 && (
+            <button
+              onClick={() => onTrade(selectedCardIds)}
+              disabled={!canTrade}
+              className="w-full px-3 py-1.5 bg-primary text-primary-foreground rounded-md text-xs font-medium hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {selectedCardIds.length < 3
+                ? `Select ${3 - selectedCardIds.length} more`
+                : canTrade
+                ? 'Trade Selected Cards'
+                : 'Invalid set — try another combo'}
+            </button>
+          )}
+
+          {canSelect && selectedCardIds.length === 0 && !mustTrade && cards.length >= 3 && (
+            <p className="text-xs text-muted-foreground">Tap cards to select a set of 3 to trade</p>
+          )}
+
+          {!canSelect && cards.length > 0 && (
+            <p className="text-xs text-muted-foreground/60">Trade available during Reinforce phase</p>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
 
 function DiceDisplay({ rolls, label, color }: { rolls: number[]; label: string; color: string }) {
   return (
@@ -29,11 +161,12 @@ export default function MultiplayerActionPanel() {
     phase, currentPlayerIndex, reinforcementsLeft, attackSource, attackTarget,
     fortifySource, fortifyTarget, lastDiceRoll, territories, players, awaitingMoveIn,
     capturedTerritory, endPhase, executeAttack, executeFortify, moveArmiesAfterCapture,
-    log, isMyTurn, mySlotIndex,
+    tradeInCards, log, isMyTurn, mySlotIndex,
   } = useMultiplayerStore();
 
   const [moveCount, setMoveCount] = useState(1);
   const [fortifyCount, setFortifyCount] = useState(1);
+  const [selectedCardIds, setSelectedCardIds] = useState<string[]>([]);
 
   const currentPlayer = players.find(p => p.slotIndex === currentPlayerIndex);
   const myPlayer = players.find(p => p.slotIndex === mySlotIndex);
@@ -73,7 +206,9 @@ export default function MultiplayerActionPanel() {
 
         {isMyTurn ? (
           <p className="text-sm text-muted-foreground mt-1">
-            {phase === 'REINFORCE' && `Place ${reinforcementsLeft} reinforcements on your territories.`}
+            {phase === 'REINFORCE' && (myPlayer?.cards ?? []).length >= 5
+              ? 'You must trade in cards before placing troops.'
+              : phase === 'REINFORCE' && `Place ${reinforcementsLeft} reinforcements on your territories.`}
             {phase === 'ATTACK' && 'Select a territory to attack from, then a target.'}
             {phase === 'FORTIFY' && 'Move armies between two adjacent territories, or skip.'}
           </p>
@@ -98,35 +233,15 @@ export default function MultiplayerActionPanel() {
         </div>
       )}
 
-      {/* Your Cards - only visible when it's your turn */}
-      {isMyTurn && myPlayer && myPlayer.cards && myPlayer.cards.length > 0 && (
-        <div className="px-4 py-2 border-b border-border bg-muted/30">
-          <div className="flex items-center gap-1.5 text-amber-500 mb-2">
-            <Coins size={12} />
-            <span className="text-xs font-semibold">YOUR CARDS ({myPlayer.cards.length})</span>
-          </div>
-          <div className="grid grid-cols-4 gap-1.5">
-            {[
-              { type: 'Infantry', color: 'hsl(0, 84%, 60%)' },
-              { type: 'Cavalry', color: 'hsl(48, 96%, 53%)' },
-              { type: 'Artillery', color: 'hsl(217, 91%, 60%)' },
-              { type: 'Wild', color: 'hsl(270, 67%, 60%)' },
-            ].map(card => {
-              const count = (myPlayer.cards || []).filter((c) => c.type === card.type).length;
-              return count > 0 ? (
-                <div key={card.type} className="flex flex-col items-center bg-secondary rounded px-1.5 py-1">
-                  <span className="font-mono-tabular text-sm font-bold text-foreground">{count}</span>
-                  <span className="text-xs text-muted-foreground text-center leading-tight">{card.type}</span>
-                </div>
-              ) : null;
-            })}
-          </div>
-          {myPlayer.cards.length >= 3 && (
-            <div className="mt-1.5 p-1.5 bg-primary/20 rounded text-xs text-primary text-center font-medium">
-              You can trade 3+ cards!
-            </div>
-          )}
-        </div>
+      {/* Cards - always visible for own player */}
+      {myPlayer && (
+        <CardsPanel
+          cards={myPlayer.cards ?? []}
+          phase={isMyTurn ? phase : 'WAITING'}
+          selectedCardIds={selectedCardIds}
+          setSelectedCardIds={setSelectedCardIds}
+          onTrade={async (ids) => { await tradeInCards(ids); setSelectedCardIds([]); }}
+        />
       )}
 
       {/* Phase actions - only shown when it's my turn */}

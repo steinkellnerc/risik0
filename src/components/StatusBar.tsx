@@ -1,6 +1,8 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useGameStore } from '../game/store';
 import { PLAYER_NAMES } from '../game/types';
+import { Home } from 'lucide-react';
 
 const PLAYER_BG = [
   'bg-player-1', 'bg-player-2', 'bg-player-3', 'bg-player-4', 'bg-player-5', 'bg-player-6',
@@ -8,6 +10,7 @@ const PLAYER_BG = [
 
 export default function StatusBar() {
   const navigate = useNavigate();
+  const [confirmLeave, setConfirmLeave] = useState(false);
   const { currentPlayerIndex, phase, turn, players, territories, reinforcementsLeft, winner, useMissions, initGame } = useGameStore();
 
   const playerTerritories = (idx: number) =>
@@ -39,6 +42,23 @@ export default function StatusBar() {
 
   return (
     <div className="h-12 bg-surface flex items-center px-4 gap-4 shadow-elevated overflow-x-auto">
+      {/* Home button */}
+      {confirmLeave ? (
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="text-xs text-muted-foreground">Leave game?</span>
+          <button onClick={() => navigate('/')} className="px-2 py-1 text-xs bg-destructive text-destructive-foreground rounded-md hover:opacity-90">Leave</button>
+          <button onClick={() => setConfirmLeave(false)} className="px-2 py-1 text-xs bg-secondary text-muted-foreground rounded-md hover:text-foreground">Stay</button>
+        </div>
+      ) : (
+        <button
+          onClick={() => setConfirmLeave(true)}
+          className="flex items-center gap-1 px-2 py-1 text-xs text-muted-foreground hover:text-foreground bg-secondary rounded-md transition-colors shrink-0"
+          title="Return to Home"
+        >
+          <Home size={13} />
+        </button>
+      )}
+
       {/* Turn info */}
       <div className="flex items-center gap-2 shrink-0">
         <span className="text-muted-foreground text-xs">TURN</span>

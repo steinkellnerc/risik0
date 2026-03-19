@@ -25,9 +25,11 @@ import {
   updatePlayer,
   addGameLog,
   grantCard,
+  returnCards,
   subscribeToGame,
   unsubscribeFromGame,
 } from '../lib/multiplayerSync';
+import { getTradeInValue } from './types';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 
 export interface MultiplayerGameState {
@@ -90,6 +92,7 @@ export interface MultiplayerGameState {
   selectFortifySource: (territoryId: string) => void;
   selectFortifyTarget: (territoryId: string) => void;
   executeFortify: (count: number) => Promise<void>;
+  tradeInCards: (cardIds: string[]) => Promise<void>;
   endPhase: () => Promise<void>;
   runAITurn: () => Promise<void>;
 }
@@ -515,6 +518,36 @@ export const useMultiplayerStore = create<MultiplayerGameState>((set, get) => ({
     await get().endPhase();
   },
 
+  // ==================== TRADE IN CARDS ====================
+  tradeInCards: async (cardIds: string[]) => {
+    const s = get();
+    if (!s.gameId || s.phase !== 'REINFORCE' || s.mySlotIndex === null) return;
+    const myPlayer = s.players.find(p => p.slotIndex === s.mySlotIndex);
+    if (!myPlayer) return;
+
+    const selectedCards = cardIds.map(id => myPlayer.cards.find(c => c.id === id)).filter(Boolean) as RiskCard[];
+    if (selectedCards.length !== 3) return;
+
+    const bonus = getTradeInValue(s.tradeInCount);
+    const remainingCards = myPlayer.cards.filter(c => !cardIds.includes(c.id));
+    const newArmies = s.reinforcementsLeft + bonus;
+
+    // Optimistic update
+    const updatedPlayers = s.players.map(p =>
+      p.slotIndex === s.mySlotIndex ? { ...p, cards: remainingCards } : p
+    );
+    set({ players: updatedPlayers, reinforcementsLeft: newArmies, tradeInCount: s.tradeInCount + 1 });
+
+    // Write to DB
+    await returnCards(cardIds);
+    await updatePlayer(s.gameId, s.mySlotIndex, {
+      cards: remainingCards,
+      armies_to_place: newArmies,
+    });
+    await updateGame(s.gameId, { trade_in_count: s.tradeInCount + 1 });
+    await addGameLog(s.gameId, s.mySlotIndex, `Traded cards for ${bonus} armies`, 'info');
+  },
+
   // ==================== END PHASE ====================
   endPhase: async () => {
     const s = get();
@@ -531,12 +564,18 @@ export const useMultiplayerStore = create<MultiplayerGameState>((set, get) => ({
       if (s.hasConqueredThisTurn) {
         const card = await grantCard(s.gameId, s.currentPlayerIndex);
         if (card) {
+          const newCard: RiskCard = { id: card.id, type: card.type as RiskCard['type'], territoryId: card.territoryId ?? '' };
           const updatedPlayers = s.players.map(p =>
             p.slotIndex === s.currentPlayerIndex
-              ? { ...p, cards: [...p.cards, { type: card.type as RiskCard['type'], territoryId: card.territoryId ?? '' }] }
+              ? { ...p, cards: [...p.cards, newCard] }
               : p
           );
           set({ players: updatedPlayers });
+          // Persist cards to players table so they survive realtime updates
+          const myPlayer = updatedPlayers.find(p => p.slotIndex === s.currentPlayerIndex);
+          if (myPlayer) {
+            await updatePlayer(s.gameId, s.currentPlayerIndex, { cards: myPlayer.cards });
+          }
           await addGameLog(s.gameId, s.currentPlayerIndex, 'Earned a Risk card', 'info');
         }
       }

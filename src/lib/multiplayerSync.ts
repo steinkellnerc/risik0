@@ -429,7 +429,7 @@ export async function listOpenGames(currentUserId?: string): Promise<Array<{
 
 // ==================== GRANT CARD ====================
 
-export async function grantCard(gameId: string, playerSlotIndex: number): Promise<{ type: string; territoryId: string | null } | null> {
+export async function grantCard(gameId: string, playerSlotIndex: number): Promise<{ id: string; type: string; territoryId: string | null } | null> {
   const { data: card } = await supabase
     .from('risk_cards')
     .select('id, type, territory_id')
@@ -445,7 +445,15 @@ export async function grantCard(gameId: string, playerSlotIndex: number): Promis
     .update({ player_slot_index: playerSlotIndex })
     .eq('id', card.id);
 
-  return { type: card.type as string, territoryId: card.territory_id as string | null };
+  return { id: card.id as string, type: card.type as string, territoryId: card.territory_id as string | null };
+}
+
+export async function returnCards(cardIds: string[]): Promise<void> {
+  if (!cardIds.length) return;
+  await supabase
+    .from('risk_cards')
+    .update({ player_slot_index: null })
+    .in('id', cardIds);
 }
 
 // ==================== LIST ACTIVE GAMES FOR USER ====================
