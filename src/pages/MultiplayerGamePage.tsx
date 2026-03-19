@@ -23,7 +23,7 @@ export default function MultiplayerGamePage() {
   const [isStarting, setIsStarting] = useState(false);
 
   const {
-    connect, disconnect, status, players, connected, mySlotIndex,
+    connect, disconnect, status, players, connected, mySlotIndex, myUserId, hostUserId,
   } = useMultiplayerStore();
 
   // Connect to game on mount
@@ -74,7 +74,7 @@ export default function MultiplayerGamePage() {
   }, [gameId, status, user, connect]);
 
   const handleLeave = async () => {
-    const isHost = mySlotIndex === 0;
+    const isHost = !!myUserId && myUserId === hostUserId;
     disconnect();
     if (isHost && status === 'LOBBY' && gameId) {
       try { await cancelGame(gameId); } catch { /* ignore */ }
@@ -135,7 +135,7 @@ export default function MultiplayerGamePage() {
   // Lobby view
   if (status === 'LOBBY') {
     const humanPlayers = players.filter(p => !p.isAi);
-    const isHost = mySlotIndex === 0;
+    const isHost = !!myUserId && myUserId === hostUserId;
     const displayName = user?.user_metadata?.display_name || user?.email?.split('@')[0] || 'Player';
 
     // Always show at least the current user even if DB fetch is slow

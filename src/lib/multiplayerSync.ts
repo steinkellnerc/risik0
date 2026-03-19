@@ -130,10 +130,15 @@ export async function joinGame(
       is_ai: false,
     });
 
-  // If duplicate key error, user likely already exists - that's ok
+  // If duplicate key error, re-fetch our own row to get the actual slot
   if (error?.code === '23505') {
-    console.log('Player already joined this game');
-    return slotIndex;
+    const { data: myRow } = await supabase
+      .from('players')
+      .select('slot_index')
+      .eq('game_id', gameId)
+      .eq('user_id', userId)
+      .single();
+    return myRow?.slot_index ?? slotIndex;
   }
 
   if (error) throw new Error(error.message);
