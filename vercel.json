@@ -3,6 +3,9 @@
   "devCommand": "npm run dev",
   "installCommand": "npm install --legacy-peer-deps",
   "framework": "vite",
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/index.html" }
+  ],
   "env": {
     "VITE_SUPABASE_URL": "https://oymmcqrpahirztevqkpv.supabase.co",
     "VITE_SUPABASE_PROJECT_ID": "oymmcqrpahirztevqkpv",
