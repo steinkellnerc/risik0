@@ -64,6 +64,7 @@ export async function createGame(
       turn_phase: 'REINFORCE',
       turn_number: 1,
       use_missions: useMissions,
+      host_user_id: hostUserId,
     })
     .select()
     .single();
@@ -377,21 +378,42 @@ export function unsubscribeFromGame(channel: RealtimeChannel): void {
 
 // ==================== LIST AVAILABLE GAMES ====================
 
-export async function listOpenGames(): Promise<Array<{
+export async function listOpenGames(currentUserId?: string): Promise<Array<{
   id: string;
   created_at: string;
   status: string;
   playerCount: number;
   hostUserId: string | null;
+  useMissions: boolean;
 }>> {
   const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
-  const { data: games } = await supabase
-    .from('games')
-    .select('id, created_at, status')
-    .eq('status', 'LOBBY')
-    .gte('created_at', twoHoursAgo)
-    .order('created_at', { ascending: false })
-    .limit(20);
+
+  // Fetch recent games + any games hosted by the current user (so they can delete old ones)
+  const [recentRes, myRes] = await Promise.all([
+    supabase
+      .from('games')
+      .select('id, created_at, status, host_user_id, use_missions')
+      .eq('status', 'LOBBY')
+      .gte('created_at', twoHoursAgo)
+      .order('created_at', { ascending: false })
+      .limit(20),
+    currentUserId
+      ? supabase
+          .from('games')
+          .select('id, created_at, status, host_user_id, use_missions')
+          .eq('status', 'LOBBY')
+          .eq('host_user_id', currentUserId)
+          .order('created_at', { ascending: false })
+      : Promise.resolve({ data: [] }),
+  ]);
+
+  // Merge, deduplicate by id
+  const allGames = [...(recentRes.data ?? [])];
+  for (const g of (myRes.data ?? [])) {
+    if (!allGames.find(x => x.id === g.id)) allGames.push(g);
+  }
+
+  const games = allGames;
 
   if (!games) return [];
 
@@ -413,7 +435,8 @@ export async function listOpenGames(): Promise<Array<{
     results.push({
       ...game,
       playerCount: countResult.count ?? 0,
-      hostUserId: (hostResult.data?.user_id as string | null) ?? null,
+      hostUserId: (game.host_user_id as string | null) ?? (hostResult.data?.user_id as string | null) ?? null,
+      useMissions: (game.use_missions as boolean) ?? false,
     });
   }
   return results;

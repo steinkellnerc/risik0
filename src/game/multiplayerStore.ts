@@ -143,8 +143,10 @@ export const useMultiplayerStore = create<MultiplayerGameState>((set, get) => ({
     const state = await fetchGameState(gameId);
     const myPlayer = state.players.find((p: Record<string, unknown>) => p.user_id === userId);
     const mySlot = myPlayer ? (myPlayer.slot_index as number) : null;
-    const hostPlayer = state.players.find((p: Record<string, unknown>) => p.slot_index === 0);
-    const hostUserId = (hostPlayer?.user_id as string | null) ?? null;
+    // Prefer host_user_id from the game record (RLS-safe), fall back to slot-0 player
+    const hostFromGame = state.game.host_user_id as string | null;
+    const hostFromPlayers = (state.players.find((p: Record<string, unknown>) => p.slot_index === 0)?.user_id as string | null) ?? null;
+    const hostUserId = hostFromGame ?? hostFromPlayers;
 
     // Convert territories from DB format
     const territories: Record<string, TerritoryState> = {};

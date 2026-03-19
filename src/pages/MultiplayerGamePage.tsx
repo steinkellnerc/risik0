@@ -7,7 +7,7 @@ import { supabase } from '../lib/supabase';
 import GameMap from '../components/GameMap';
 import MultiplayerActionPanel from '../components/MultiplayerActionPanel';
 import MultiplayerStatusBar from '../components/MultiplayerStatusBar';
-import { Play, Users, Copy, Check, AlertCircle, ArrowLeft, Crown } from 'lucide-react';
+import { Play, Users, Copy, Check, AlertCircle, ArrowLeft, Crown, Target, Trash2 } from 'lucide-react';
 
 const PLAYER_BG = [
   'bg-player-1', 'bg-player-2', 'bg-player-3', 'bg-player-4', 'bg-player-5', 'bg-player-6',
@@ -21,10 +21,14 @@ export default function MultiplayerGamePage() {
   const [humanSlots, setHumanSlots] = useState(2);
   const [error, setError] = useState('');
   const [isStarting, setIsStarting] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const {
-    connect, disconnect, status, players, connected, mySlotIndex, myUserId, hostUserId,
+    connect, disconnect, status, players, connected, mySlotIndex,
+    myUserId, hostUserId, useMissions,
   } = useMultiplayerStore();
+
+  const isHost = !!myUserId && !!hostUserId && myUserId === hostUserId;
 
   // Connect to game on mount
   useEffect(() => {
@@ -57,7 +61,7 @@ export default function MultiplayerGamePage() {
     return () => disconnect();
   }, [gameId, user, connect, disconnect]);
 
-  // Subscribe to player changes in lobby — re-fetch on any player change
+  // Subscribe to player changes in lobby
   useEffect(() => {
     if (!gameId || status !== 'LOBBY') return;
 
@@ -73,13 +77,22 @@ export default function MultiplayerGamePage() {
     return () => { supabase.removeChannel(channel); };
   }, [gameId, status, user, connect]);
 
-  const handleLeave = async () => {
-    const isHost = !!myUserId && myUserId === hostUserId;
+  const handleLeave = () => {
     disconnect();
-    if (isHost && status === 'LOBBY' && gameId) {
-      try { await cancelGame(gameId); } catch { /* ignore */ }
-    }
     navigate('/lobby');
+  };
+
+  const handleDeleteGame = async () => {
+    if (!gameId) return;
+    setIsDeleting(true);
+    try {
+      disconnect();
+      await cancelGame(gameId);
+      navigate('/lobby');
+    } catch {
+      setIsDeleting(false);
+      setError('Failed to delete game');
+    }
   };
 
   const handleStartGame = async () => {
@@ -135,115 +148,134 @@ export default function MultiplayerGamePage() {
   // Lobby view
   if (status === 'LOBBY') {
     const humanPlayers = players.filter(p => !p.isAi);
-    const isHost = !!myUserId && myUserId === hostUserId;
     const displayName = user?.user_metadata?.display_name || user?.email?.split('@')[0] || 'Player';
-
-    // Always show at least the current user even if DB fetch is slow
     const displayPlayers = humanPlayers.length > 0
       ? humanPlayers
-      : [{ id: 'me', slotIndex: mySlotIndex, displayName, color: '', userId: user?.id ?? null, isAi: false, armiesToPlace: 0, eliminated: false, secretObjective: null, cards: [] }];
+      : [{ id: 'me', slotIndex: mySlotIndex ?? 0, displayName, color: '', userId: user?.id ?? null, isAi: false, armiesToPlace: 0, eliminated: false, secretObjective: null, cards: [] }];
 
     return (
-      <div className="h-screen bg-background flex flex-col items-center justify-center px-4">
-        {/* Back button */}
-        <button
-          onClick={handleLeave}
-          className="absolute top-4 left-4 flex items-center gap-1.5 px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground bg-secondary rounded-lg transition-colors"
-        >
-          <ArrowLeft size={13} /> {isHost ? 'Cancel & Leave' : 'Leave Lobby'}
-        </button>
+      <div className="h-screen bg-background flex flex-col overflow-y-auto">
+        {/* Top bar */}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
+          <button
+            onClick={handleLeave}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground bg-secondary rounded-lg transition-colors"
+          >
+            <ArrowLeft size={13} /> {isHost ? 'Back' : 'Leave'}
+          </button>
 
-        <div className="w-full max-w-md space-y-5">
-          <div className="text-center space-y-1">
-            <h1 className="text-3xl font-bold text-foreground tracking-tight">Game Lobby</h1>
-            <p className="text-muted-foreground text-sm">
-              {isHost ? 'You are the host — invite players and start when ready' : `Waiting for host to start…`}
-            </p>
+          <div className="flex items-center gap-2">
+            <span className={`inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full font-medium ${useMissions ? 'bg-purple-500/20 text-purple-400' : 'bg-amber-500/20 text-amber-400'}`}>
+              {useMissions ? <><Target size={11} /> Secret Missions</> : <><Crown size={11} /> World Domination</>}
+            </span>
           </div>
 
-          {/* Players joined */}
-          <div className="bg-surface rounded-xl p-4 space-y-2 shadow-elevated">
-            <div className="flex items-center justify-between mb-1">
+          {isHost && (
+            <button
+              onClick={handleDeleteGame}
+              disabled={isDeleting}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-destructive hover:text-destructive bg-destructive/10 hover:bg-destructive/20 rounded-lg transition-colors disabled:opacity-50"
+            >
+              <Trash2 size={13} /> Delete Game
+            </button>
+          )}
+          {!isHost && <div className="w-20" />}
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 flex flex-col items-center justify-center px-4 py-6">
+          <div className="w-full max-w-md space-y-5">
+            <div className="text-center space-y-1">
+              <h1 className="text-3xl font-bold text-foreground tracking-tight">Game Lobby</h1>
+              <p className="text-muted-foreground text-sm">
+                {isHost ? 'Set up the game and start when ready' : 'Waiting for the host to start…'}
+              </p>
+            </div>
+
+            {/* Players joined */}
+            <div className="bg-surface rounded-xl p-4 space-y-2 shadow-elevated">
               <span className="text-sm font-semibold text-foreground flex items-center gap-2">
                 <Users size={14} /> Players ({displayPlayers.length} / {humanSlots})
               </span>
+              {displayPlayers.map(p => (
+                <div key={p.id} className="flex items-center gap-3 px-3 py-2 rounded-lg bg-muted/50">
+                  <div className={`w-3 h-3 rounded-full shrink-0 ${PLAYER_BG[p.slotIndex] ?? 'bg-muted'}`} />
+                  <span className="text-sm text-foreground flex-1 font-medium">{p.displayName}</span>
+                  {p.userId === hostUserId && (
+                    <span className="flex items-center gap-1 text-xs text-primary font-semibold">
+                      <Crown size={11} /> Host
+                    </span>
+                  )}
+                  {p.userId === myUserId && p.userId !== hostUserId && (
+                    <span className="text-xs text-muted-foreground">You</span>
+                  )}
+                </div>
+              ))}
+              {displayPlayers.length < humanSlots && (
+                <p className="text-xs text-muted-foreground px-1">
+                  Waiting for {humanSlots - displayPlayers.length} more player{humanSlots - displayPlayers.length !== 1 ? 's' : ''}…
+                </p>
+              )}
             </div>
-            {displayPlayers.map(p => (
-              <div key={p.id} className="flex items-center gap-3 px-3 py-2 rounded-lg bg-muted/50">
-                <div className={`w-3 h-3 rounded-full shrink-0 ${PLAYER_BG[p.slotIndex] ?? 'bg-muted'}`} />
-                <span className="text-sm text-foreground flex-1 font-medium">{p.displayName}</span>
-                {p.slotIndex === 0 && (
-                  <span className="flex items-center gap-1 text-xs text-primary font-semibold">
-                    <Crown size={11} /> Host
-                  </span>
-                )}
+
+            {/* Share link */}
+            <div className="bg-surface rounded-xl p-4 shadow-elevated">
+              <p className="text-xs text-muted-foreground mb-2">Share this link to invite players:</p>
+              <button
+                onClick={handleCopyLink}
+                className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-secondary text-foreground rounded-lg text-xs font-medium hover:opacity-90 transition-opacity"
+              >
+                {copied ? <Check size={14} /> : <Copy size={14} />}
+                {copied ? 'Copied!' : 'Copy Game Link'}
+              </button>
+            </div>
+
+            {/* Host-only controls */}
+            {isHost && (
+              <>
+                <div className="bg-surface rounded-xl p-4 space-y-3 shadow-elevated">
+                  <span className="text-sm font-semibold text-foreground">Human Player Slots</span>
+                  <div className="flex gap-2">
+                    {[1, 2, 3, 4, 5, 6].map(num => (
+                      <button
+                        key={num}
+                        onClick={() => setHumanSlots(num)}
+                        className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${
+                          humanSlots === num ? 'bg-primary text-primary-foreground' : 'bg-secondary text-muted-foreground hover:text-foreground'
+                        }`}
+                      >
+                        {num}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {6 - humanSlots} slot{6 - humanSlots !== 1 ? 's' : ''} will be filled by AI
+                  </p>
+                </div>
+
+                <button
+                  onClick={handleStartGame}
+                  disabled={isStarting}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-primary text-primary-foreground rounded-xl text-base font-bold hover:opacity-90 transition-opacity shadow-glow disabled:opacity-50"
+                >
+                  <Play size={18} /> {isStarting ? 'Starting…' : 'Start Game'}
+                </button>
+              </>
+            )}
+
+            {!isHost && (
+              <div className="text-center text-muted-foreground text-sm py-2">
+                Waiting for host to start the game…
               </div>
-            ))}
-            {displayPlayers.length < humanSlots && (
-              <p className="text-xs text-muted-foreground px-1">
-                Waiting for {humanSlots - displayPlayers.length} more player{humanSlots - displayPlayers.length !== 1 ? 's' : ''}…
-              </p>
+            )}
+
+            {error && (
+              <div className="flex gap-2 text-destructive text-sm bg-destructive/10 rounded-lg px-3 py-2">
+                <AlertCircle size={16} className="shrink-0 mt-0.5" />
+                <span>{error}</span>
+              </div>
             )}
           </div>
-
-          {/* Share link */}
-          <div className="bg-surface rounded-xl p-4 shadow-elevated">
-            <p className="text-xs text-muted-foreground mb-2">Share this link to invite players:</p>
-            <button
-              onClick={handleCopyLink}
-              className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-secondary text-foreground rounded-lg text-xs font-medium hover:opacity-90 transition-opacity"
-            >
-              {copied ? <Check size={14} /> : <Copy size={14} />}
-              {copied ? 'Copied!' : 'Copy Game Link'}
-            </button>
-          </div>
-
-          {/* Human slots selector (host only) */}
-          {isHost && (
-            <div className="bg-surface rounded-xl p-4 space-y-3 shadow-elevated">
-              <span className="text-sm font-semibold text-foreground">Human Player Slots</span>
-              <div className="flex gap-2">
-                {[1, 2, 3, 4, 5, 6].map(num => (
-                  <button
-                    key={num}
-                    onClick={() => setHumanSlots(num)}
-                    className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${
-                      humanSlots === num
-                        ? 'bg-primary text-primary-foreground'
-                        : 'bg-secondary text-muted-foreground hover:text-foreground'
-                    }`}
-                  >
-                    {num}
-                  </button>
-                ))}
-              </div>
-              <div className="text-xs text-muted-foreground">
-                {6 - humanSlots} slot{6 - humanSlots !== 1 ? 's' : ''} will be filled by AI
-              </div>
-            </div>
-          )}
-
-          {/* Start / waiting */}
-          {isHost ? (
-            <button
-              onClick={handleStartGame}
-              disabled={isStarting}
-              className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-primary text-primary-foreground rounded-xl text-base font-bold hover:opacity-90 transition-opacity shadow-glow disabled:opacity-50"
-            >
-              <Play size={18} /> {isStarting ? 'Starting…' : 'Start Game'}
-            </button>
-          ) : (
-            <div className="text-center text-muted-foreground text-sm py-2">
-              Waiting for host to start the game…
-            </div>
-          )}
-
-          {error && (
-            <div className="flex gap-2 text-destructive text-sm bg-destructive/10 rounded-lg px-3 py-2">
-              <AlertCircle size={16} className="shrink-0 mt-0.5" />
-              <span>{error}</span>
-            </div>
-          )}
         </div>
       </div>
     );
