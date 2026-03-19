@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useGameStore } from '../game/store';
 import { PLAYER_NAMES, type RiskCard } from '../game/types';
 import { TERRITORY_MAP } from '../game/mapData';
-import { Swords, Shield, Move, ChevronRight, Dices, Target, ScrollText } from 'lucide-react';
+import { Swords, Shield, Move, ChevronRight, Dices, Target, ScrollText, ChevronDown, ChevronUp } from 'lucide-react';
 
 function isValidSet(cards: RiskCard[]): boolean {
   if (cards.length !== 3) return false;
@@ -44,6 +44,16 @@ function DiceDisplay({ rolls, label, color }: { rolls: number[]; label: string; 
   );
 }
 
+function findValidSet(cards: RiskCard[]): RiskCard[] | null {
+  for (let i = 0; i < cards.length - 2; i++)
+    for (let j = i + 1; j < cards.length - 1; j++)
+      for (let k = j + 1; k < cards.length; k++) {
+        const combo = [cards[i], cards[j], cards[k]];
+        if (isValidSet(combo)) return combo;
+      }
+  return null;
+}
+
 function CardsPanel({
   cards, phase, selectedCardIds, setSelectedCardIds, onTrade,
 }: {
@@ -57,6 +67,7 @@ function CardsPanel({
   const selectedCards = cards.filter(c => selectedCardIds.includes(c.id));
   const canTrade = selectedCards.length === 3 && isValidSet(selectedCards);
   const canSelect = phase === 'REINFORCE';
+  const bestSet = mustTrade ? findValidSet(cards) : null;
 
   const toggleCard = (id: string) => {
     if (!canSelect) return;
@@ -75,7 +86,7 @@ function CardsPanel({
           <span className="text-xs font-semibold">CARDS ({cards.length})</span>
         </div>
         {mustTrade && (
-          <span className="text-xs font-bold text-destructive">MUST TRADE</span>
+          <span className="text-xs font-bold text-destructive animate-pulse">MUST TRADE</span>
         )}
       </div>
 
@@ -86,6 +97,7 @@ function CardsPanel({
           <div className="flex flex-wrap gap-1 mb-2">
             {cards.map(card => {
               const isSelected = selectedCardIds.includes(card.id);
+              const isInBestSet = bestSet?.some(c => c.id === card.id) ?? false;
               const isDisabled = !isSelected && selectedCardIds.length >= 3;
               return (
                 <button
@@ -95,6 +107,8 @@ function CardsPanel({
                   className={`px-2 py-0.5 rounded text-xs font-medium border transition-all ${
                     isSelected
                       ? 'bg-primary text-primary-foreground border-primary'
+                      : mustTrade && isInBestSet && selectedCardIds.length === 0
+                      ? 'bg-destructive/20 text-foreground border-destructive/60 cursor-pointer'
                       : canSelect && !isDisabled
                       ? 'bg-secondary text-foreground border-border hover:border-primary/60 cursor-pointer'
                       : 'bg-secondary text-muted-foreground border-border opacity-70'
@@ -105,6 +119,16 @@ function CardsPanel({
               );
             })}
           </div>
+
+          {/* One-click trade when forced */}
+          {mustTrade && bestSet && selectedCardIds.length === 0 && (
+            <button
+              onClick={() => onTrade(bestSet.map(c => c.id))}
+              className="w-full px-3 py-1.5 bg-destructive text-destructive-foreground rounded-md text-xs font-medium hover:opacity-90 transition-opacity"
+            >
+              Trade Best Set (required)
+            </button>
+          )}
 
           {canSelect && selectedCardIds.length > 0 && (
             <button
@@ -120,7 +144,7 @@ function CardsPanel({
             </button>
           )}
 
-          {canSelect && selectedCardIds.length === 0 && cards.length >= 3 && (
+          {canSelect && selectedCardIds.length === 0 && !mustTrade && cards.length >= 3 && (
             <p className="text-xs text-muted-foreground">Tap cards to select a set of 3 to trade</p>
           )}
 
@@ -144,6 +168,7 @@ export default function ActionPanel() {
   const [moveCount, setMoveCount] = useState(1);
   const [fortifyCount, setFortifyCount] = useState(1);
   const [selectedCardIds, setSelectedCardIds] = useState<string[]>([]);
+  const [mobileExpanded, setMobileExpanded] = useState(true);
 
   const player = players[currentPlayerIndex];
   const pName = PLAYER_NAMES[currentPlayerIndex];
@@ -168,25 +193,38 @@ export default function ActionPanel() {
   const maxMoveIn = captureSource ? captureSource.armies - 1 : 1;
 
   return (
-    <div className="w-80 bg-surface h-full flex flex-col shadow-elevated">
-      {/* Header */}
-      <div className="p-4 border-b border-border">
+    <div className="w-full md:w-80 bg-surface md:h-full flex flex-col shadow-elevated border-t md:border-t-0 md:border-l border-border">
+      {/* Header — acts as mobile toggle */}
+      <div
+        className="p-3 md:p-4 border-b border-border cursor-pointer md:cursor-default"
+        onClick={() => setMobileExpanded(v => !v)}
+      >
         <div className="flex items-center gap-2">
           <div className={`w-3 h-3 rounded-full bg-player-${currentPlayerIndex + 1}`} />
-          <span className="text-base font-semibold text-foreground">
+          <span className="text-base font-semibold text-foreground flex-1">
             {player?.isAI ? '🤖 ' : ''}{pName}
           </span>
+          <span className="text-xs font-semibold text-primary">{phase}</span>
+          {phase === 'REINFORCE' && reinforcementsLeft > 0 && (
+            <span className="font-mono-tabular text-primary text-sm ml-1">+{reinforcementsLeft}</span>
+          )}
+          <span className="md:hidden ml-2 text-muted-foreground">
+            {mobileExpanded ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
+          </span>
         </div>
-        <p className="text-sm text-muted-foreground mt-1">
+        <p className="text-xs text-muted-foreground mt-1 hidden md:block">
           {phase === 'REINFORCE' && player?.cards.length >= 5
             ? 'You must trade in cards before placing troops.'
             : phase === 'REINFORCE'
             ? `Place ${reinforcementsLeft} reinforcements on your territories.`
             : phase === 'ATTACK'
-            ? 'Select a territory to attack from, then a target.'
+            ? 'Click an enemy territory to target it, then pick a source — or click your own territory first.'
             : 'Move armies between two adjacent territories, or skip.'}
         </p>
       </div>
+
+      {/* Collapsible body on mobile */}
+      <div className={`${mobileExpanded ? 'flex' : 'hidden'} md:flex flex-col flex-1 overflow-hidden max-h-[55vh] md:max-h-full`}>
 
       {/* Secret Mission */}
       {useMissions && missions[currentPlayerIndex] && !player?.isAI && (
@@ -354,14 +392,16 @@ export default function ActionPanel() {
       </div>
 
       {/* Game Log */}
-      <div className="border-t border-border p-3 max-h-48 overflow-y-auto">
-        <span className="text-sm text-muted-foreground font-semibold mb-2 block">COMMAND LOG</span>
+      <div className="border-t border-border p-3 max-h-32 md:max-h-48 overflow-y-auto">
+        <span className="text-xs text-muted-foreground font-semibold mb-2 block">COMMAND LOG</span>
         <div className="space-y-1">
           {log.slice(0, 20).map((entry, i) => (
-            <p key={i} className="text-sm text-foreground/70 leading-snug">{entry.message}</p>
+            <p key={i} className="text-xs text-foreground/70 leading-snug">{entry.message}</p>
           ))}
         </div>
       </div>
+
+      </div>{/* end collapsible body */}
     </div>
   );
 }

@@ -51,7 +51,7 @@ export const TERRITORIES: Territory[] = [
   // Europe
   { id: 'iceland', name: 'Iceland', continentId: 'europe', cx: 400, cy: 68, adjacent: ['greenland', 'scandinavia', 'great-britain'] },
   { id: 'scandinavia', name: 'Scandinavia', continentId: 'europe', cx: 480, cy: 72, adjacent: ['iceland', 'ukraine', 'northern-europe'] },
-  { id: 'great-britain', name: 'Great Britain', continentId: 'europe', cx: 400, cy: 130, adjacent: ['iceland', 'scandinavia', 'northern-europe', 'western-europe'] },
+  { id: 'great-britain', name: 'Great Britain', continentId: 'europe', cx: 400, cy: 130, adjacent: ['iceland', 'northern-europe', 'western-europe'] },
   { id: 'northern-europe', name: 'N. Europe', continentId: 'europe', cx: 470, cy: 135, adjacent: ['scandinavia', 'great-britain', 'ukraine', 'western-europe', 'southern-europe'] },
   { id: 'western-europe', name: 'W. Europe', continentId: 'europe', cx: 410, cy: 200, adjacent: ['great-britain', 'northern-europe', 'southern-europe', 'north-africa'] },
   { id: 'southern-europe', name: 'S. Europe', continentId: 'europe', cx: 480, cy: 195, adjacent: ['northern-europe', 'western-europe', 'ukraine', 'north-africa', 'egypt', 'middle-east'] },
