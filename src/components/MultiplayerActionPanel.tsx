@@ -232,9 +232,12 @@ export default function MultiplayerActionPanel() {
 
       {/* Secret Mission — always visible, outside collapsible */}
       {myMission && (
-        <div className="px-3 py-1.5 border-b border-border bg-muted/30 flex items-start gap-1.5">
-          <Target size={11} className="text-primary mt-0.5 shrink-0" />
-          <p className="text-xs text-foreground/80 leading-snug">{myMission}</p>
+        <div className="px-3 py-2 border-b-2 border-primary/30 bg-primary/10 flex flex-col gap-1">
+          <div className="flex items-center gap-1.5">
+            <Target size={12} className="text-primary shrink-0" />
+            <span className="text-xs font-bold text-primary uppercase tracking-wide">Your Mission</span>
+          </div>
+          <p className="text-xs text-foreground leading-snug">{myMission}</p>
         </div>
       )}
 

@@ -114,16 +114,19 @@ export default function MultiplayerStatusBar() {
           <span className="font-mono-tabular text-xs text-foreground">{playerTerritories(p.slotIndex)}</span>
           <Square size={9} className="text-muted-foreground/60" />
           <span className="font-mono-tabular text-xs text-foreground">{playerArmies(p.slotIndex)}</span>
-          <span className={`font-mono-tabular text-xs ${p.cards.length > 0 ? 'text-foreground' : 'text-muted-foreground/40'}`}>🃏{p.cards.length}</span>
+          <span className={`font-mono-tabular text-xs ${p.cards.length > 0 ? 'text-foreground' : 'text-muted-foreground'}`}>🃏{p.cards.length}</span>
         </div>
       ))}
     </div>
 
     {/* Secret mission — always visible on mobile below the status row */}
     {myMission && (
-      <div className="md:hidden px-3 py-1.5 border-t border-border bg-muted/30 flex items-start gap-1.5">
-        <Target size={11} className="text-primary mt-0.5 shrink-0" />
-        <p className="text-xs text-foreground/80 leading-snug">{myMission}</p>
+      <div className="md:hidden px-3 py-2 border-t-2 border-primary/30 bg-primary/10 flex flex-col gap-1">
+        <div className="flex items-center gap-1.5">
+          <Target size={12} className="text-primary shrink-0" />
+          <span className="text-xs font-bold text-primary uppercase tracking-wide">Your Mission</span>
+        </div>
+        <p className="text-xs text-foreground leading-snug">{myMission}</p>
       </div>
     )}
     </div>
