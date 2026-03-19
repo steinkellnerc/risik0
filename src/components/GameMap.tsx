@@ -153,20 +153,12 @@ export default function GameMap({ multiplayer = false }: { multiplayer?: boolean
     if (phase === 'REINFORCE') {
       placeReinforcement(tid);
     } else if (phase === 'ATTACK') {
-      if (!attackSource) {
+      if (tState.ownerId === currentPlayerIndex) {
+        // Own territory: set as source (keep target if adjacent)
         selectAttackSource(tid);
-      } else if (!attackTarget) {
-        if (tState.ownerId === currentPlayerIndex) {
-          selectAttackSource(tid); // reselect
-        } else {
-          selectAttackTarget(tid);
-        }
       } else {
-        if (tState.ownerId === currentPlayerIndex) {
-          selectAttackSource(tid);
-        } else {
-          selectAttackTarget(tid);
-        }
+        // Enemy territory: set as target (then player picks source)
+        selectAttackTarget(tid);
       }
     } else if (phase === 'FORTIFY') {
       if (!fortifySource) {
@@ -228,6 +220,9 @@ export default function GameMap({ multiplayer = false }: { multiplayer?: boolean
           const isSource = attackSource === t.id || fortifySource === t.id;
           const isTarget = attackTarget === t.id;
           const isOwned = state.ownerId === currentPlayerIndex;
+          // Highlight potential attack sources when target is selected but no source yet
+          const isPotentialSource = phase === 'ATTACK' && !attackSource && !!attackTarget &&
+            isOwned && state.armies >= 2 && t.adjacent.includes(attackTarget);
           const canInteract = isReadOnly ? false :
             phase === 'REINFORCE' ? isOwned :
             phase === 'ATTACK' ? true :
@@ -238,14 +233,14 @@ export default function GameMap({ multiplayer = false }: { multiplayer?: boolean
               className={canInteract ? 'cursor-pointer' : 'cursor-default'}>
               {/* Territory circle */}
               <motion.circle
-                cx={t.cx} cy={t.cy} r={isSource ? 20 : 16}
+                cx={t.cx} cy={t.cy} r={isSource ? 20 : isPotentialSource ? 19 : 16}
                 fill={dimColor}
-                stroke={isSource ? color : isTarget ? 'hsl(0, 84%, 60%)' : color}
-                strokeWidth={isSource || isTarget ? 2.5 : 1.2}
+                stroke={isSource ? color : isTarget ? 'hsl(0, 84%, 60%)' : isPotentialSource ? 'hsl(48, 96%, 53%)' : color}
+                strokeWidth={isSource || isTarget || isPotentialSource ? 2.5 : 1.2}
                 opacity={0.9}
                 whileHover={canInteract ? { scale: 1.15 } : {}}
                 transition={{ duration: 0.15 }}
-                className={isSource ? 'animate-pulse-territory' : ''}
+                className={isSource || isPotentialSource ? 'animate-pulse-territory' : ''}
               />
               {/* Army count */}
               <text x={t.cx} y={t.cy + 1} textAnchor="middle" dominantBaseline="middle"

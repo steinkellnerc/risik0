@@ -223,16 +223,23 @@ export const useGameStore = create<GameStore>((set, get) => ({
     if (s.phase !== 'ATTACK') return;
     if (s.territories[territoryId]?.ownerId !== s.currentPlayerIndex) return;
     if (s.territories[territoryId].armies < 2) return;
-    set({ attackSource: territoryId, attackTarget: null, lastDiceRoll: null });
+    // Keep existing target if this source is adjacent to it
+    const keepTarget = s.attackTarget &&
+      TERRITORIES.find(t => t.id === territoryId)?.adjacent.includes(s.attackTarget);
+    set({ attackSource: territoryId, attackTarget: keepTarget ? s.attackTarget : null, lastDiceRoll: null });
   },
 
   selectAttackTarget: (territoryId: string) => {
     const s = get();
-    if (!s.attackSource) return;
-    const source = TERRITORIES.find(t => t.id === s.attackSource)!;
-    if (!source.adjacent.includes(territoryId)) return;
+    if (s.phase !== 'ATTACK') return;
     if (s.territories[territoryId]?.ownerId === s.currentPlayerIndex) return;
-    set({ attackTarget: territoryId });
+    // If source already selected, validate adjacency
+    if (s.attackSource) {
+      const source = TERRITORIES.find(t => t.id === s.attackSource)!;
+      if (!source.adjacent.includes(territoryId)) return;
+    }
+    // Target-first: clear source since it hasn't been validated yet
+    set({ attackTarget: territoryId, attackSource: s.attackSource ?? null, lastDiceRoll: null });
   },
 
   executeAttack: (attackDice: number, defendDice: number) => {
@@ -443,8 +450,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
       get().placeReinforcement(action.territoryId);
     }
 
-    // Move to attack phase
-    get().endPhase();
+    // Move to attack phase (placeReinforcement auto-advances on last placement, avoid double-advance)
+    if (get().phase === 'REINFORCE') {
+      get().endPhase();
+    }
 
     // Attack — re-evaluate each round so AI adapts as territories change
     let attacksThisTurn = 0;
