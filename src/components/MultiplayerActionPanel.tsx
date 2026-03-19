@@ -230,19 +230,16 @@ export default function MultiplayerActionPanel() {
         </p>
       </div>
 
-      {/* Collapsible body */}
-      <div className={`${mobileExpanded ? 'flex' : 'hidden'} md:flex flex-col flex-1 overflow-hidden max-h-[50vh] md:max-h-full`}>
-
-      {/* Secret Mission */}
+      {/* Secret Mission — always visible, outside collapsible */}
       {myMission && (
-        <div className="px-3 py-2 border-b border-border bg-muted/30">
-          <div className="flex items-center gap-1.5 text-primary mb-0.5">
-            <Target size={11} />
-            <span className="text-xs font-semibold">SECRET MISSION</span>
-          </div>
+        <div className="px-3 py-1.5 border-b border-border bg-muted/30 flex items-start gap-1.5">
+          <Target size={11} className="text-primary mt-0.5 shrink-0" />
           <p className="text-xs text-foreground/80 leading-snug">{myMission}</p>
         </div>
       )}
+
+      {/* Collapsible body */}
+      <div className={`${mobileExpanded ? 'flex' : 'hidden'} md:flex flex-col flex-1 overflow-hidden max-h-[50vh] md:max-h-full`}>
 
       {/* Cards — full panel on my turn, compact count otherwise */}
       {myPlayer && isMyTurn && (
