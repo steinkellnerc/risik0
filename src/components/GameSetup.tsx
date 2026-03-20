@@ -2,8 +2,7 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useGameStore } from '../game/store';
 import { PLAYER_NAMES } from '../game/types';
-import { Bot, User, Target, Crown, Map } from 'lucide-react';
-import { getMapStyle, saveMapStyle } from '../lib/mapStyle';
+import { Bot, User, Target, Crown } from 'lucide-react';
 
 const PLAYER_DOTS = [
   'bg-player-1', 'bg-player-2', 'bg-player-3', 'bg-player-4', 'bg-player-5', 'bg-player-6',
@@ -13,13 +12,6 @@ export default function GameSetup() {
   const initGame = useGameStore(s => s.initGame);
   const [humanCount, setHumanCount] = useState(2);
   const [useMissions, setUseMissions] = useState(true);
-  const [classicMap, setClassicMap] = useState(() => getMapStyle() === 'classic');
-
-  const toggleClassicMap = (val: boolean) => {
-    setClassicMap(val);
-    saveMapStyle(val ? 'classic' : 'modern');
-  };
-
   return (
     <div className="h-screen bg-background flex flex-col items-center justify-center px-4">
       <motion.div
@@ -119,38 +111,6 @@ export default function GameSetup() {
               ? 'Each player receives a secret objective card. First to complete their mission wins.'
               : 'Classic mode — conquer all 42 territories to win.'}
           </p>
-        </div>
-
-        {/* Map style toggle */}
-        <div className="bg-surface rounded-xl p-5 space-y-3 shadow-elevated">
-          <div className="flex items-center gap-2 text-foreground">
-            <Map size={16} />
-            <span className="text-sm font-semibold">Map Style</span>
-          </div>
-          <div className="flex gap-2">
-            <button
-              onClick={() => toggleClassicMap(false)}
-              className={`flex-1 py-3 rounded-lg text-sm font-medium transition-all ${
-                !classicMap ? 'bg-primary text-primary-foreground shadow-glow' : 'bg-secondary text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              <div className="flex flex-col items-center gap-1">
-                <span className="text-base">🖥</span>
-                <span>Modern</span>
-              </div>
-            </button>
-            <button
-              onClick={() => toggleClassicMap(true)}
-              className={`flex-1 py-3 rounded-lg text-sm font-medium transition-all ${
-                classicMap ? 'bg-primary text-primary-foreground shadow-glow' : 'bg-secondary text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              <div className="flex flex-col items-center gap-1">
-                <span className="text-base">🗺</span>
-                <span>Classic Board</span>
-              </div>
-            </button>
-          </div>
         </div>
 
         {/* Start button */}
