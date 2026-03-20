@@ -418,10 +418,37 @@ export const useMultiplayerStore = create<MultiplayerGameState>((set, get) => ({
           `${s.players.find(p => p.slotIndex === defenderId)?.displayName || PLAYER_NAMES[defenderId]} eliminated!`, 'elimination');
       }
 
-      // Check win
+      // Build updated eliminated array for mission checks
+      const eliminatedAfter = s.players.map(p =>
+        p.slotIndex === defenderId ? (defenderEliminated || p.eliminated) : p.eliminated
+      );
+
+      // Check win: world domination
       if (checkWorldDomination(s.currentPlayerIndex, newTerritories)) {
         const winnerPlayer = s.players.find(p => p.slotIndex === s.currentPlayerIndex);
         winnerId = winnerPlayer?.userId ?? null;
+      }
+
+      // Check win: missions
+      if (!winnerId && s.useMissions && s.gameId) {
+        const missionMap = assignMissionsSeeded(s.gameId, 6);
+        // Check attacker's mission (conquer/destroy)
+        const attackerMission = missionMap[s.currentPlayerIndex];
+        if (attackerMission && checkMissionComplete(s.currentPlayerIndex, attackerMission, newTerritories, eliminatedAfter)) {
+          const winnerPlayer = s.players.find(p => p.slotIndex === s.currentPlayerIndex);
+          winnerId = winnerPlayer?.userId ?? null;
+        }
+        // If defender was eliminated, check all players with destroy_player missions targeting them
+        if (!winnerId && defenderEliminated) {
+          for (const p of s.players) {
+            if (p.slotIndex === s.currentPlayerIndex) continue;
+            const m = missionMap[p.slotIndex];
+            if (m && checkMissionComplete(p.slotIndex, m, newTerritories, eliminatedAfter)) {
+              winnerId = p.userId ?? null;
+              break;
+            }
+          }
+        }
       }
     }
 
@@ -578,9 +605,9 @@ export const useMultiplayerStore = create<MultiplayerGameState>((set, get) => ({
       await addGameLog(s.gameId, s.currentPlayerIndex, 'Attack phase', 'info');
       set({ phase: 'ATTACK', attackSource: null, attackTarget: null, lastDiceRoll: null });
     } else if (s.phase === 'ATTACK') {
-      // Grant a card if a human player conquered at least one territory this turn
+      // Grant a card if a player conquered at least one territory this turn
       const currentPlayer = s.players.find(p => p.slotIndex === s.currentPlayerIndex);
-      if (s.hasConqueredThisTurn && currentPlayer && !currentPlayer.isAi) {
+      if (s.hasConqueredThisTurn && currentPlayer) {
         const CARD_TYPES: RiskCard['type'][] = ['Infantry', 'Cavalry', 'Artillery'];
         const type = CARD_TYPES[Math.floor(Math.random() * CARD_TYPES.length)];
         const newCard: RiskCard = { id: crypto.randomUUID(), type, territoryId: '' };
@@ -654,43 +681,54 @@ export const useMultiplayerStore = create<MultiplayerGameState>((set, get) => ({
     await get().endPhase();
     await delay(500);
 
-    // Attack
-    const attacks = aiDecideAttacks(s.currentPlayerIndex, get().territories);
-    for (const attack of attacks) {
-      const currentTerritories = get().territories;
-      const src = currentTerritories[attack.source];
-      const tgt = currentTerritories[attack.target];
-      if (!src || !tgt || src.ownerId !== s.currentPlayerIndex || tgt.ownerId === s.currentPlayerIndex) continue;
-      if (src.armies < 2) continue;
+    // Attack — recalculate after each conquest to chain opportunities
+    let attackRounds = 0;
+    while (attackRounds < 5 && get().winnerId === null) {
+      const attacks = aiDecideAttacks(s.currentPlayerIndex, get().territories);
+      if (attacks.length === 0) break;
+      let madeAttack = false;
 
-      get().selectAttackSource(attack.source);
-      get().selectAttackTarget(attack.target);
-      await delay(300);
+      for (const attack of attacks) {
+        const currentTerritories = get().territories;
+        const src = currentTerritories[attack.source];
+        const tgt = currentTerritories[attack.target];
+        if (!src || !tgt || src.ownerId !== s.currentPlayerIndex || tgt.ownerId === s.currentPlayerIndex) continue;
+        if (src.armies < 2) continue;
 
-      const maxDice = Math.min(3, get().territories[attack.source].armies - 1);
-      const defDice = Math.min(2, get().territories[attack.target].armies);
-      if (maxDice >= 1 && defDice >= 1) {
-        await get().executeAttack(maxDice, defDice);
-        await delay(400);
+        get().selectAttackSource(attack.source);
+        get().selectAttackTarget(attack.target);
+        await delay(300);
 
-        if (get().awaitingMoveIn && get().capturedTerritory) {
-          const capturedTerr = get().capturedTerritory!;
-          const t = TERRITORY_MAP.get(capturedTerr);
-          if (t) {
-            const srcEntry = t.adjacent.find(a => {
-              const ts = get().territories[a];
-              return ts && ts.ownerId === s.currentPlayerIndex && ts.armies > 1;
-            });
-            if (srcEntry) {
-              const moveCount = Math.max(1, Math.floor((get().territories[srcEntry].armies - 1) / 2));
-              await get().moveArmiesAfterCapture(moveCount);
+        const maxDice = Math.min(3, get().territories[attack.source].armies - 1);
+        const defDice = Math.min(2, get().territories[attack.target].armies);
+        if (maxDice >= 1 && defDice >= 1) {
+          await get().executeAttack(maxDice, defDice);
+          await delay(400);
+          madeAttack = true;
+
+          if (get().awaitingMoveIn && get().capturedTerritory) {
+            const capturedTerr = get().capturedTerritory!;
+            const t = TERRITORY_MAP.get(capturedTerr);
+            if (t) {
+              const srcEntry = t.adjacent.find(a => {
+                const ts = get().territories[a];
+                return ts && ts.ownerId === s.currentPlayerIndex && ts.armies > 1;
+              });
+              if (srcEntry) {
+                const moveCount = Math.max(1, Math.floor((get().territories[srcEntry].armies - 1) / 2));
+                await get().moveArmiesAfterCapture(moveCount);
+              }
             }
+            await delay(200);
+            break; // recalculate after each capture
           }
-          await delay(200);
         }
+
+        if (get().winnerId !== null) return;
       }
 
-      if (get().winnerId !== null) return;
+      if (!madeAttack) break;
+      attackRounds++;
     }
 
     // End attack → fortify

@@ -155,8 +155,8 @@ export function aiDecideAttacks(
   candidates.sort((a, b) => b.score - a.score);
 
   for (const c of candidates) {
-    // Attack if ratio >= 1.2, or at equal odds for strong continent/easy-pick motivation
-    if (c.ratio >= 1.2 || (c.score >= 3 && c.ratio >= 0.9)) {
+    // Attack if ratio >= 1.0 (equal or better odds), or at slight disadvantage for strong strategic motivation
+    if (c.ratio >= 1.0 || (c.score >= 3 && c.ratio >= 0.8)) {
       const maxDice = Math.min(3, territories[c.source].armies - 1);
       if (maxDice >= 1) {
         attacks.push({ type: 'attack', source: c.source, target: c.target, dice: maxDice });
