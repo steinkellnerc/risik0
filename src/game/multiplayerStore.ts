@@ -656,10 +656,7 @@ export const useMultiplayerStore = create<MultiplayerGameState>((set, get) => ({
         isMyTurn: s.mySlotIndex === next,
       });
 
-      // Trigger AI if next player is AI
-      if (nextPlayer?.isAi) {
-        setTimeout(() => get().runAITurn(), 1000);
-      }
+      // AI turn is triggered via onGameUpdate when the DB change arrives
     }
   },
 
@@ -667,6 +664,8 @@ export const useMultiplayerStore = create<MultiplayerGameState>((set, get) => ({
   runAITurn: async () => {
     const s = get();
     if (!s.gameId) return;
+    // Only the host runs AI to prevent concurrent writes from multiple clients
+    if (s.myUserId !== s.hostUserId) return;
     const player = s.players.find(p => p.slotIndex === s.currentPlayerIndex);
     if (!player?.isAi) return;
 
@@ -677,8 +676,10 @@ export const useMultiplayerStore = create<MultiplayerGameState>((set, get) => ({
       await delay(200);
     }
 
-    // End reinforce → attack
-    await get().endPhase();
+    // End reinforce → attack (placeReinforcement auto-advances on last placement, avoid double-advance)
+    if (get().phase === 'REINFORCE') {
+      await get().endPhase();
+    }
     await delay(500);
 
     // Attack — recalculate after each conquest to chain opportunities
