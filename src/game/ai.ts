@@ -169,13 +169,13 @@ export function aiDecideAttacks(
   candidates.sort((a, b) => b.score - a.score);
 
   for (const c of candidates) {
-    // Attack anything where we're not heavily outnumbered (ratio >= 0.5)
-    // or where mission/strategic motivation is high enough to accept the odds
-    if (c.ratio >= 0.5 || c.score >= 4) {
-      const maxDice = Math.min(3, territories[c.source].armies - 1);
-      if (maxDice >= 1) {
-        attacks.push({ type: 'attack', source: c.source, target: c.target, dice: maxDice });
-      }
+    const srcArmies = territories[c.source].armies;
+    // High-priority (mission / continent completion): accept 3-army source and softer ratio
+    if (c.score >= 8 && srcArmies >= 3 && c.ratio >= 0.8) {
+      attacks.push({ type: 'attack', source: c.source, target: c.target, dice: Math.min(3, srcArmies - 1) });
+    // Standard attack: require 4+ armies at source (3 attacking dice) and favorable odds
+    } else if (srcArmies >= 4 && c.ratio >= 1.2) {
+      attacks.push({ type: 'attack', source: c.source, target: c.target, dice: Math.min(3, srcArmies - 1) });
     }
   }
 
