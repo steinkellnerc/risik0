@@ -390,6 +390,15 @@ export const useGameStore = create<GameStore>((set, get) => ({
     if (s.phase === 'REINFORCE' && s.reinforcementsLeft > 0) return;
 
     if (s.phase === 'REINFORCE') {
+      // Check mission completion after all reinforcements are placed
+      if (s.useMissions && s.missions[s.currentPlayerIndex]) {
+        const eliminated = s.players.map(p => p.eliminated);
+        if (checkMissionComplete(s.currentPlayerIndex, s.missions[s.currentPlayerIndex], s.territories, eliminated)) {
+          set({ winner: s.currentPlayerIndex });
+          get().addLog(`${PLAYER_NAMES[s.currentPlayerIndex]} completed their secret mission!`);
+          return;
+        }
+      }
       set({ phase: 'ATTACK', attackSource: null, attackTarget: null, lastDiceRoll: null });
       get().addLog('Attack phase');
     } else if (s.phase === 'ATTACK') {

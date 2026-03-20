@@ -433,7 +433,7 @@ export const useMultiplayerStore = create<MultiplayerGameState>((set, get) => ({
 
       // Check win: missions
       if (!winnerId && s.useMissions && s.gameId) {
-        const missionMap = assignMissionsSeeded(s.gameId, 6);
+        const missionMap = assignMissionsSeeded(s.gameId, s.players.length);
         // Check attacker's mission (conquer/destroy)
         const attackerMission = missionMap[s.currentPlayerIndex];
         if (attackerMission && checkMissionComplete(s.currentPlayerIndex, attackerMission, newTerritories, eliminatedAfter)) {
@@ -605,6 +605,22 @@ export const useMultiplayerStore = create<MultiplayerGameState>((set, get) => ({
     if (s.phase === 'REINFORCE' && s.reinforcementsLeft > 0) return;
 
     if (s.phase === 'REINFORCE') {
+      // Check mission completion after all reinforcements are placed
+      if (s.useMissions && s.gameId) {
+        const missionMap = assignMissionsSeeded(s.gameId, s.players.length);
+        const mission = missionMap[s.currentPlayerIndex];
+        const eliminated = s.players.map(p => p.eliminated);
+        if (mission && checkMissionComplete(s.currentPlayerIndex, mission, s.territories, eliminated)) {
+          const winnerPlayer = s.players.find(p => p.slotIndex === s.currentPlayerIndex);
+          const wId = winnerPlayer?.userId ?? null;
+          if (wId) {
+            set({ winnerId: wId });
+            await updateGame(s.gameId, { winner_id: wId, status: 'finished' });
+            await addGameLog(s.gameId, s.currentPlayerIndex, `${winnerPlayer?.displayName} wins by completing their mission!`, 'win');
+            return;
+          }
+        }
+      }
       await updateGame(s.gameId, { turn_phase: 'ATTACK' });
       await addGameLog(s.gameId, s.currentPlayerIndex, 'Attack phase', 'info');
       set({ phase: 'ATTACK', attackSource: null, attackTarget: null, lastDiceRoll: null });
