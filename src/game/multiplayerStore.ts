@@ -402,7 +402,7 @@ export const useMultiplayerStore = create<MultiplayerGameState>((set, get) => ({
     newTerritories[s.attackSource] = { ...source, armies: result.newSourceArmies };
     newTerritories[s.attackTarget] = {
       ownerId: result.newTargetOwner,
-      armies: result.captured ? 0 : result.newTargetArmies,
+      armies: result.captured ? 1 : result.newTargetArmies,
     };
 
     const targetName = s.attackTarget;
@@ -470,7 +470,7 @@ export const useMultiplayerStore = create<MultiplayerGameState>((set, get) => ({
     await updateTerritory(s.gameId, s.attackSource, { army_count: result.newSourceArmies });
     await updateTerritory(s.gameId, targetName, {
       owner_slot_index: result.newTargetOwner,
-      army_count: result.captured ? 0 : result.newTargetArmies,
+      army_count: result.captured ? 1 : result.newTargetArmies,
     });
     await updateGame(s.gameId, { has_conquered_this_turn: s.hasConqueredThisTurn || result.captured });
     await addGameLog(s.gameId, s.currentPlayerIndex, logMsg, 'attack');
