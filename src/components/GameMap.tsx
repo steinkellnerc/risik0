@@ -343,16 +343,27 @@ export default function GameMap({ multiplayer = false }: { multiplayer?: boolean
             return (
               <g key={t.id} onClick={() => !dragRef.current.moved && handleTerritoryClick(t.id)}
                 className={canInteract ? 'cursor-pointer' : 'cursor-default'}>
+                {/* Outer attack ring — double ring effect for attack target */}
+                {isTarget && (
+                  <motion.circle
+                    cx={t.cx} cy={t.cy} r={27}
+                    fill="none"
+                    stroke="hsl(0, 84%, 60%)"
+                    strokeWidth={2}
+                    strokeDasharray="4,3"
+                    className="animate-pulse-territory"
+                  />
+                )}
                 {/* Territory circle */}
                 <motion.circle
-                  cx={t.cx} cy={t.cy} r={isSource ? 20 : isPotentialSource ? 19 : 16}
+                  cx={t.cx} cy={t.cy} r={isSource ? 20 : isPotentialSource ? 19 : isTarget ? 20 : 16}
                   fill={dimColor}
                   stroke={isSource ? color : isTarget ? 'hsl(0, 84%, 60%)' : isPotentialSource ? 'hsl(48, 96%, 53%)' : color}
                   strokeWidth={isSource || isTarget || isPotentialSource ? 2.5 : 1.2}
                   opacity={0.9}
                   whileHover={canInteract ? { scale: 1.15 } : {}}
                   transition={{ duration: 0.15 }}
-                  className={isSource || isPotentialSource ? 'animate-pulse-territory' : ''}
+                  className={isSource || isTarget || isPotentialSource ? 'animate-pulse-territory' : ''}
                 />
                 {/* Army count */}
                 <text x={t.cx} y={t.cy + 1} textAnchor="middle" dominantBaseline="middle"

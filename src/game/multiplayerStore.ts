@@ -560,8 +560,8 @@ export const useMultiplayerStore = create<MultiplayerGameState>((set, get) => ({
     await updateTerritory(s.gameId, fTarget, { army_count: s.territories[fTarget].armies + count });
     await addGameLog(s.gameId, s.currentPlayerIndex, `Fortified ${count} to ${fTarget}`, 'fortify');
 
-    // End phase
-    await get().endPhase();
+    // Reset selections so player can make another fortify move; endPhase is via the "End Turn" button
+    set({ fortifySource: null, fortifyTarget: null });
   },
 
   // ==================== TRADE IN CARDS ====================

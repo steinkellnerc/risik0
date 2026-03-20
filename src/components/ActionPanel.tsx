@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useGameStore } from '../game/store';
 import { PLAYER_NAMES, type RiskCard } from '../game/types';
@@ -170,6 +170,11 @@ export default function ActionPanel() {
   const [selectedCardIds, setSelectedCardIds] = useState<string[]>([]);
   const [mobileExpanded, setMobileExpanded] = useState(true);
 
+  // Reset move-in slider whenever a new capture happens
+  useEffect(() => { if (awaitingMoveIn) setMoveCount(1); }, [awaitingMoveIn]);
+  // Reset fortify slider when selections change (after each fortify move or new selection)
+  useEffect(() => { setFortifyCount(1); }, [fortifySource, fortifyTarget]);
+
   const player = players[currentPlayerIndex];
   const pName = PLAYER_NAMES[currentPlayerIndex];
 
@@ -284,12 +289,13 @@ export default function ActionPanel() {
               <div className="bg-secondary rounded-lg p-3 space-y-3">
                 <p className="text-xs text-foreground font-medium">Territory captured! Move armies in:</p>
                 <div className="flex items-center gap-2">
-                  <input type="range" min={1} max={maxMoveIn} value={moveCount}
+                  <input type="range" min={1} max={Math.max(1, maxMoveIn)}
+                    value={Math.min(moveCount, Math.max(1, maxMoveIn))}
                     onChange={e => setMoveCount(Number(e.target.value))}
                     className="flex-1 accent-primary" />
-                  <span className="font-mono-tabular text-sm text-foreground w-8 text-right">{moveCount}</span>
+                  <span className="font-mono-tabular text-sm text-foreground w-8 text-right">{Math.min(moveCount, Math.max(1, maxMoveIn))}</span>
                 </div>
-                <button onClick={() => { moveArmiesAfterCapture(moveCount); setMoveCount(1); }}
+                <button onClick={() => { moveArmiesAfterCapture(Math.min(moveCount, Math.max(1, maxMoveIn))); setMoveCount(1); }}
                   className="w-full px-3 py-1.5 bg-primary text-primary-foreground rounded-md text-xs font-medium hover:opacity-90 transition-opacity">
                   Move In
                 </button>
@@ -370,12 +376,13 @@ export default function ActionPanel() {
             {fortifySource && fortifyTarget && (
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
-                  <input type="range" min={1} max={maxFortify} value={fortifyCount}
+                  <input type="range" min={1} max={Math.max(1, maxFortify)}
+                    value={Math.min(fortifyCount, Math.max(1, maxFortify))}
                     onChange={e => setFortifyCount(Number(e.target.value))}
                     className="flex-1 accent-primary" />
-                  <span className="font-mono-tabular text-sm text-foreground w-8 text-right">{fortifyCount}</span>
+                  <span className="font-mono-tabular text-sm text-foreground w-8 text-right">{Math.min(fortifyCount, Math.max(1, maxFortify))}</span>
                 </div>
-                <button onClick={() => { executeFortify(fortifyCount); setFortifyCount(1); }}
+                <button onClick={() => { executeFortify(Math.min(fortifyCount, Math.max(1, maxFortify))); }}
                   className="w-full px-3 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:opacity-90 transition-opacity">
                   Move {fortifyCount} Armies
                 </button>
@@ -384,7 +391,7 @@ export default function ActionPanel() {
 
             <button onClick={endPhase}
               className="w-full flex items-center justify-center gap-2 px-4 py-2 border border-border text-muted-foreground rounded-md text-sm hover:bg-secondary transition-colors">
-              <span>Skip → End Turn</span>
+              <span>End Turn</span>
               <ChevronRight size={14} />
             </button>
           </div>

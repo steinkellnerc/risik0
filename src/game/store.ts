@@ -376,7 +376,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
       },
     });
     get().addLog(`Fortified ${count} to ${s.fortifyTarget}`);
-    get().endPhase();
+    // Reset selections so player can make another fortify move; endPhase is via the "End Turn" button
+    set({ fortifySource: null, fortifyTarget: null });
   },
 
   endPhase: () => {
