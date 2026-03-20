@@ -766,18 +766,17 @@ export const useMultiplayerStore = create<MultiplayerGameState>((set, get) => ({
 
     // End attack → fortify
     await get().endPhase();
-    await delay(500);
+    await delay(200);
 
     // Fortify
     const fortifyAction = aiFortify(s.currentPlayerIndex, get().territories);
     if (fortifyAction) {
       get().selectFortifySource(fortifyAction.source);
       get().selectFortifyTarget(fortifyAction.target);
-      await delay(300);
       await get().executeFortify(fortifyAction.count);
-    } else {
-      await get().endPhase();
     }
+    // Always end the fortify phase (executeFortify no longer auto-advances)
+    await get().endPhase();
   },
 }));
 
