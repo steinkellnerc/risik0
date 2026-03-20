@@ -34,10 +34,31 @@ export default function MultiplayerStatusBar() {
   if (winnerId) {
     const winner = players.find(p => p.userId === winnerId);
     return (
-      <div className="h-12 bg-surface flex items-center justify-between px-4 shadow-elevated">
-        <span className="text-lg font-semibold text-foreground">
-          {winner?.displayName || 'Unknown'} wins the game!
+      <div className="bg-surface shadow-elevated px-4 py-5 flex flex-col items-center gap-4">
+        <span className="text-2xl font-bold text-foreground">
+          🏆 {winner?.displayName || 'Unknown'} wins the game!
         </span>
+        {useMissions && winner?.secretObjective && (
+          <p className="text-sm text-primary font-medium text-center">
+            Mission: {winner.secretObjective}
+          </p>
+        )}
+        {useMissions && (
+          <div className="w-full max-w-lg bg-muted rounded-lg p-3 space-y-1.5">
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">All missions revealed</span>
+            {players.map(p => (
+              <div key={p.slotIndex} className="flex items-start gap-2 text-xs">
+                <div className={`w-2 h-2 rounded-full mt-0.5 shrink-0 ${PLAYER_BG[p.slotIndex]}`} />
+                <span className={`font-semibold shrink-0 ${p.userId === winnerId ? 'text-primary' : 'text-muted-foreground'}`}>
+                  {p.isAi ? 'AI ' : ''}{p.displayName}:
+                </span>
+                <span className={p.userId === winnerId ? 'text-primary' : 'text-foreground'}>
+                  {p.secretObjective ?? '—'}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
         <button
           onClick={handleLeave}
           className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground bg-secondary rounded-lg transition-colors"

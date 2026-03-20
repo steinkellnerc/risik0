@@ -11,7 +11,7 @@ const PLAYER_BG = [
 export default function StatusBar() {
   const navigate = useNavigate();
   const [confirmLeave, setConfirmLeave] = useState(false);
-  const { currentPlayerIndex, phase, turn, players, territories, reinforcementsLeft, winner, useMissions, initGame } = useGameStore();
+  const { currentPlayerIndex, phase, turn, players, territories, reinforcementsLeft, winner, useMissions, missions, initGame } = useGameStore();
 
   const playerTerritories = (idx: number) =>
     Object.values(territories).filter(t => t.ownerId === idx).length;
@@ -19,23 +19,47 @@ export default function StatusBar() {
     Object.values(territories).filter(t => t.ownerId === idx).reduce((s, t) => s + t.armies, 0);
 
   if (winner !== null) {
+    const winnerMission = useMissions ? missions[winner] : null;
     return (
-      <div className="h-12 bg-surface flex items-center justify-center gap-6 shadow-elevated px-4">
-        <span className="text-lg font-semibold text-foreground">
+      <div className="bg-surface shadow-elevated px-4 py-5 flex flex-col items-center gap-4">
+        <span className="text-2xl font-bold text-foreground">
           🏆 {PLAYER_NAMES[winner]} wins the game!
         </span>
-        <button
-          onClick={() => navigate('/')}
-          className="px-3 py-1.5 text-xs font-semibold bg-secondary text-foreground rounded-lg hover:bg-primary hover:text-primary-foreground transition-colors"
-        >
-          Return to Lobby
-        </button>
-        <button
-          onClick={() => initGame(players.filter(p => !p.isAI).length, useMissions)}
-          className="px-3 py-1.5 text-xs font-semibold bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity"
-        >
-          Play Again
-        </button>
+        {winnerMission && (
+          <p className="text-sm text-primary font-medium text-center">
+            Mission: {winnerMission.description}
+          </p>
+        )}
+        {useMissions && (
+          <div className="w-full max-w-lg bg-muted rounded-lg p-3 space-y-1.5">
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">All missions revealed</span>
+            {players.map((p, i) => (
+              <div key={i} className="flex items-start gap-2 text-xs">
+                <div className={`w-2 h-2 rounded-full mt-0.5 shrink-0 ${PLAYER_BG[i]}`} />
+                <span className={`font-semibold shrink-0 ${i === winner ? 'text-primary' : 'text-muted-foreground'}`}>
+                  {p.isAI ? '🤖 ' : ''}{p.name}:
+                </span>
+                <span className={i === winner ? 'text-primary' : 'text-foreground'}>
+                  {missions[i]?.description ?? '—'}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+        <div className="flex gap-2">
+          <button
+            onClick={() => navigate('/')}
+            className="px-3 py-1.5 text-xs font-semibold bg-secondary text-foreground rounded-lg hover:bg-primary hover:text-primary-foreground transition-colors"
+          >
+            Return to Lobby
+          </button>
+          <button
+            onClick={() => initGame(players.filter(p => !p.isAI).length, useMissions)}
+            className="px-3 py-1.5 text-xs font-semibold bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity"
+          >
+            Play Again
+          </button>
+        </div>
       </div>
     );
   }

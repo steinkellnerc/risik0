@@ -35,18 +35,19 @@ const CARD_LABELS: Record<string, string> = {
 };
 
 function CardsPanel({
-  cards, phase, selectedCardIds, setSelectedCardIds, onTrade,
+  cards, phase, active, selectedCardIds, setSelectedCardIds, onTrade,
 }: {
   cards: RiskCard[];
   phase: string;
+  active: boolean;
   selectedCardIds: string[];
   setSelectedCardIds: (ids: string[]) => void;
   onTrade: (ids: string[]) => void;
 }) {
-  const mustTrade = cards.length >= 5;
+  const mustTrade = active && cards.length >= 5;
   const selectedCards = cards.filter(c => selectedCardIds.includes(c.id));
   const canTrade = selectedCards.length === 3 && isValidSet(selectedCards);
-  const canSelect = phase === 'REINFORCE';
+  const canSelect = active && phase === 'REINFORCE';
   const bestSet = mustTrade ? findValidSet(cards) : null;
 
   const toggleCard = (id: string) => {
@@ -249,21 +250,16 @@ export default function MultiplayerActionPanel() {
       {/* Collapsible body */}
       <div className={`${mobileExpanded ? 'flex' : 'hidden'} md:flex flex-col flex-1 overflow-hidden max-h-[50vh] md:max-h-full`}>
 
-      {/* Cards — full panel on my turn, compact count otherwise */}
-      {myPlayer && isMyTurn && (
+      {/* Cards — always visible to the local player, interactive only on their turn */}
+      {myPlayer && (
         <CardsPanel
           cards={myPlayer.cards ?? []}
           phase={phase}
+          active={isMyTurn}
           selectedCardIds={selectedCardIds}
           setSelectedCardIds={setSelectedCardIds}
           onTrade={async (ids) => { await tradeInCards(ids); setSelectedCardIds([]); }}
         />
-      )}
-      {myPlayer && !isMyTurn && (myPlayer.cards ?? []).length > 0 && (
-        <div className="px-3 py-1.5 border-b border-border flex items-center gap-1.5 text-muted-foreground">
-          <ScrollText size={11} />
-          <span className="text-xs">🃏{myPlayer.cards.length} cards</span>
-        </div>
       )}
 
       {/* Phase actions */}
