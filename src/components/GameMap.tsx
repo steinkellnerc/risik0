@@ -3,6 +3,8 @@ import { useRef, useState, useEffect, useCallback } from 'react';
 import { useGameStore } from '../game/store';
 import { useMultiplayerStore } from '../game/multiplayerStore';
 import { TERRITORIES, TERRITORY_MAP, CONTINENT_COLORS, CONTINENTS } from '../game/mapData';
+import { CLASSIC_COORDS } from '../game/classicCoords';
+import { getMapStyle, saveMapStyle } from '../lib/mapStyle';
 
 // Connection lines between adjacent territories
 function ConnectionLines() {
@@ -126,6 +128,12 @@ const PLAYER_HSL_DIM = [
 ];
 
 export default function GameMap({ multiplayer = false }: { multiplayer?: boolean }) {
+  const [classic, setClassicState] = useState(() => getMapStyle() === 'classic');
+  const toggleClassic = () => {
+    const next = !classic;
+    setClassicState(next);
+    saveMapStyle(next ? 'classic' : 'modern');
+  };
   // Use the appropriate store based on mode
   const localStore = useGameStore();
   const mpStore = useMultiplayerStore();
@@ -267,7 +275,7 @@ export default function GameMap({ multiplayer = false }: { multiplayer?: boolean
   return (
     <div
       ref={containerRef}
-      className="w-full h-full overflow-hidden select-none"
+      className="w-full h-full overflow-hidden select-none relative"
       style={{ cursor: dragRef.current.dragging ? 'grabbing' : 'grab' }}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
@@ -277,109 +285,168 @@ export default function GameMap({ multiplayer = false }: { multiplayer?: boolean
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
     >
-      <svg
-        ref={svgRef}
-        viewBox="0 0 960 520"
-        className="w-full h-full"
-        preserveAspectRatio="xMidYMid meet"
+      {/* Map style toggle button */}
+      <button
+        onClick={(e) => { e.stopPropagation(); toggleClassic(); }}
+        onMouseDown={(e) => e.stopPropagation()}
+        className="absolute top-2 right-2 z-10 px-2 py-1 text-xs font-semibold rounded-md bg-black/60 text-white border border-white/20 hover:bg-black/80 transition-colors select-none"
+        title="Toggle map style"
       >
-        {/* Background — outside transform so it always fills */}
-        <rect width="960" height="520" fill="hsl(222, 47%, 3%)" />
+        {classic ? 'Modern Map' : 'Classic Map'}
+      </button>
 
-        {/* Classic Risk board — place risk-board.jpg in /public to enable */}
-        <image href="/risk-board.jpg" x="0" y="0" width="960" height="520"
-          preserveAspectRatio="xMidYMid slice" opacity="0.07" />
+      {classic ? (
+        /* ==================== CLASSIC MAP ==================== */
+        <svg
+          ref={svgRef}
+          viewBox="0 0 720 720"
+          className="w-full h-full"
+          preserveAspectRatio="xMidYMid meet"
+        >
+          {/* Classic Risiko board image */}
+          <image href="/risk-map-classic.jpg" x="0" y="0" width="720" height="720"
+            preserveAspectRatio="xMidYMid meet" />
 
-        {/* Grid lines for tactical feel */}
-        <defs>
-          <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
-            <path d="M 40 0 L 0 0 0 40" fill="none" stroke="hsl(217, 32%, 10%)" strokeWidth="0.3" />
-          </pattern>
-        </defs>
-        <rect width="960" height="520" fill="url(#grid)" />
+          {/* All map content — panned and zoomed */}
+          <g transform={`translate(${transform.x},${transform.y}) scale(${transform.scale})`}>
+            {TERRITORIES.map(t => {
+              const coords = CLASSIC_COORDS[t.id];
+              if (!coords) return null;
+              const state = territories[t.id];
+              if (!state) return null;
+              const { cx, cy } = coords;
+              const color = PLAYER_HSL[state.ownerId];
+              const dimColor = PLAYER_HSL_DIM[state.ownerId];
+              const isSource = attackSource === t.id || fortifySource === t.id;
+              const isTarget = attackTarget === t.id;
+              const isOwned = state.ownerId === currentPlayerIndex;
+              const isPotentialSource = phase === 'ATTACK' && !attackSource && !!attackTarget &&
+                isOwned && state.armies >= 2 && t.adjacent.includes(attackTarget);
+              const canInteract = isReadOnly ? false :
+                phase === 'REINFORCE' ? isOwned :
+                phase === 'ATTACK' ? true :
+                phase === 'FORTIFY' ? isOwned : false;
 
-        {/* All map content — panned and zoomed */}
-        <g transform={`translate(${transform.x},${transform.y}) scale(${transform.scale})`}>
-          {/* Continent background regions */}
-          {Object.entries(CONTINENT_COLORS).map(([cid, color]) => {
-            const cTerritories = TERRITORIES.filter(t => t.continentId === cid);
-            const xs = cTerritories.map(t => t.cx);
-            const ys = cTerritories.map(t => t.cy);
-            const minX = Math.min(...xs) - 35;
-            const minY = Math.min(...ys) - 30;
-            const maxX = Math.max(...xs) + 35;
-            const maxY = Math.max(...ys) + 30;
-            return (
-              <rect key={cid} x={minX} y={minY} width={maxX - minX} height={maxY - minY}
-                rx="8" fill={color} opacity="0.5" />
-            );
-          })}
-
-          <ConnectionLines />
-
-          {/* Continent borders */}
-          <ContinentBorders />
-
-          {/* Continent bonus table */}
-          <ContinentBonusTable />
-
-          {/* Territories */}
-          {TERRITORIES.map(t => {
-            const state = territories[t.id];
-            if (!state) return null;
-            const color = PLAYER_HSL[state.ownerId];
-            const dimColor = PLAYER_HSL_DIM[state.ownerId];
-            const isSource = attackSource === t.id || fortifySource === t.id;
-            const isTarget = attackTarget === t.id;
-            const isOwned = state.ownerId === currentPlayerIndex;
-            // Highlight potential attack sources when target is selected but no source yet
-            const isPotentialSource = phase === 'ATTACK' && !attackSource && !!attackTarget &&
-              isOwned && state.armies >= 2 && t.adjacent.includes(attackTarget);
-            const canInteract = isReadOnly ? false :
-              phase === 'REINFORCE' ? isOwned :
-              phase === 'ATTACK' ? true :
-              phase === 'FORTIFY' ? isOwned : false;
-
-            return (
-              <g key={t.id} onClick={() => !dragRef.current.moved && handleTerritoryClick(t.id)}
-                className={canInteract ? 'cursor-pointer' : 'cursor-default'}>
-                {/* Outer attack ring — double ring effect for attack target */}
-                {isTarget && (
+              return (
+                <g key={t.id} onClick={() => !dragRef.current.moved && handleTerritoryClick(t.id)}
+                  className={canInteract ? 'cursor-pointer' : 'cursor-default'}>
+                  {isTarget && (
+                    <motion.circle cx={cx} cy={cy} r={27}
+                      fill="none" stroke="hsl(0, 84%, 60%)"
+                      strokeWidth={2} strokeDasharray="4,3"
+                      className="animate-pulse-territory" />
+                  )}
                   <motion.circle
-                    cx={t.cx} cy={t.cy} r={27}
-                    fill="none"
-                    stroke="hsl(0, 84%, 60%)"
-                    strokeWidth={2}
-                    strokeDasharray="4,3"
-                    className="animate-pulse-territory"
+                    cx={cx} cy={cy} r={isSource ? 20 : isPotentialSource ? 19 : isTarget ? 20 : 16}
+                    fill={dimColor}
+                    stroke={isSource ? color : isTarget ? 'hsl(0, 84%, 60%)' : isPotentialSource ? 'hsl(48, 96%, 53%)' : color}
+                    strokeWidth={isSource || isTarget || isPotentialSource ? 2.5 : 1.2}
+                    opacity={0.92}
+                    whileHover={canInteract ? { scale: 1.15 } : {}}
+                    transition={{ duration: 0.15 }}
+                    className={isSource || isTarget || isPotentialSource ? 'animate-pulse-territory' : ''}
                   />
-                )}
-                {/* Territory circle */}
-                <motion.circle
-                  cx={t.cx} cy={t.cy} r={isSource ? 20 : isPotentialSource ? 19 : isTarget ? 20 : 16}
-                  fill={dimColor}
-                  stroke={isSource ? color : isTarget ? 'hsl(0, 84%, 60%)' : isPotentialSource ? 'hsl(48, 96%, 53%)' : color}
-                  strokeWidth={isSource || isTarget || isPotentialSource ? 2.5 : 1.2}
-                  opacity={0.9}
-                  whileHover={canInteract ? { scale: 1.15 } : {}}
-                  transition={{ duration: 0.15 }}
-                  className={isSource || isTarget || isPotentialSource ? 'animate-pulse-territory' : ''}
-                />
-                {/* Army count */}
-                <text x={t.cx} y={t.cy + 1} textAnchor="middle" dominantBaseline="middle"
-                  fill="white" fontSize="15" fontFamily="IBM Plex Mono, monospace" fontWeight="700">
-                  {state.armies}
-                </text>
-                {/* Territory name */}
-                <text x={t.cx} y={t.cy + 28} textAnchor="middle" dominantBaseline="middle"
-                  fill="hsl(210, 20%, 65%)" fontSize="8.5" fontFamily="IBM Plex Sans, sans-serif" fontWeight="500">
-                  {t.name}
-                </text>
-              </g>
-            );
-          })}
-        </g>
-      </svg>
+                  <text x={cx} y={cy + 1} textAnchor="middle" dominantBaseline="middle"
+                    fill="white" fontSize="15" fontFamily="IBM Plex Mono, monospace" fontWeight="700">
+                    {state.armies}
+                  </text>
+                </g>
+              );
+            })}
+          </g>
+        </svg>
+      ) : (
+        /* ==================== MODERN MAP ==================== */
+        <svg
+          ref={svgRef}
+          viewBox="0 0 960 520"
+          className="w-full h-full"
+          preserveAspectRatio="xMidYMid meet"
+        >
+          {/* Background — outside transform so it always fills */}
+          <rect width="960" height="520" fill="hsl(222, 47%, 3%)" />
+
+          {/* Grid lines for tactical feel */}
+          <defs>
+            <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+              <path d="M 40 0 L 0 0 0 40" fill="none" stroke="hsl(217, 32%, 10%)" strokeWidth="0.3" />
+            </pattern>
+          </defs>
+          <rect width="960" height="520" fill="url(#grid)" />
+
+          {/* All map content — panned and zoomed */}
+          <g transform={`translate(${transform.x},${transform.y}) scale(${transform.scale})`}>
+            {/* Continent background regions */}
+            {Object.entries(CONTINENT_COLORS).map(([cid, color]) => {
+              const cTerritories = TERRITORIES.filter(t => t.continentId === cid);
+              const xs = cTerritories.map(t => t.cx);
+              const ys = cTerritories.map(t => t.cy);
+              const minX = Math.min(...xs) - 35;
+              const minY = Math.min(...ys) - 30;
+              const maxX = Math.max(...xs) + 35;
+              const maxY = Math.max(...ys) + 30;
+              return (
+                <rect key={cid} x={minX} y={minY} width={maxX - minX} height={maxY - minY}
+                  rx="8" fill={color} opacity="0.5" />
+              );
+            })}
+
+            <ConnectionLines />
+            <ContinentBorders />
+            <ContinentBonusTable />
+
+            {TERRITORIES.map(t => {
+              const state = territories[t.id];
+              if (!state) return null;
+              const color = PLAYER_HSL[state.ownerId];
+              const dimColor = PLAYER_HSL_DIM[state.ownerId];
+              const isSource = attackSource === t.id || fortifySource === t.id;
+              const isTarget = attackTarget === t.id;
+              const isOwned = state.ownerId === currentPlayerIndex;
+              const isPotentialSource = phase === 'ATTACK' && !attackSource && !!attackTarget &&
+                isOwned && state.armies >= 2 && t.adjacent.includes(attackTarget);
+              const canInteract = isReadOnly ? false :
+                phase === 'REINFORCE' ? isOwned :
+                phase === 'ATTACK' ? true :
+                phase === 'FORTIFY' ? isOwned : false;
+
+              return (
+                <g key={t.id} onClick={() => !dragRef.current.moved && handleTerritoryClick(t.id)}
+                  className={canInteract ? 'cursor-pointer' : 'cursor-default'}>
+                  {isTarget && (
+                    <motion.circle
+                      cx={t.cx} cy={t.cy} r={27}
+                      fill="none"
+                      stroke="hsl(0, 84%, 60%)"
+                      strokeWidth={2}
+                      strokeDasharray="4,3"
+                      className="animate-pulse-territory"
+                    />
+                  )}
+                  <motion.circle
+                    cx={t.cx} cy={t.cy} r={isSource ? 20 : isPotentialSource ? 19 : isTarget ? 20 : 16}
+                    fill={dimColor}
+                    stroke={isSource ? color : isTarget ? 'hsl(0, 84%, 60%)' : isPotentialSource ? 'hsl(48, 96%, 53%)' : color}
+                    strokeWidth={isSource || isTarget || isPotentialSource ? 2.5 : 1.2}
+                    opacity={0.9}
+                    whileHover={canInteract ? { scale: 1.15 } : {}}
+                    transition={{ duration: 0.15 }}
+                    className={isSource || isTarget || isPotentialSource ? 'animate-pulse-territory' : ''}
+                  />
+                  <text x={t.cx} y={t.cy + 1} textAnchor="middle" dominantBaseline="middle"
+                    fill="white" fontSize="15" fontFamily="IBM Plex Mono, monospace" fontWeight="700">
+                    {state.armies}
+                  </text>
+                  <text x={t.cx} y={t.cy + 28} textAnchor="middle" dominantBaseline="middle"
+                    fill="hsl(210, 20%, 65%)" fontSize="8.5" fontFamily="IBM Plex Sans, sans-serif" fontWeight="500">
+                    {t.name}
+                  </text>
+                </g>
+              );
+            })}
+          </g>
+        </svg>
+      )}
     </div>
   );
 }

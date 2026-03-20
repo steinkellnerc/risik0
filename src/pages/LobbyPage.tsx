@@ -3,7 +3,8 @@ import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import { createGame, listOpenGames, listMyActiveGames, joinGame, cancelGame } from '../lib/multiplayerSync';
-import { LogOut, Plus, Users, RefreshCw, Gamepad2, Target, Crown, Trash2 } from 'lucide-react';
+import { LogOut, Plus, Users, RefreshCw, Gamepad2, Target, Crown, Trash2, Map } from 'lucide-react';
+import { getMapStyle, saveMapStyle } from '../lib/mapStyle';
 
 type GameEntry = {
   id: string;
@@ -22,7 +23,13 @@ export default function LobbyPage() {
   const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
   const [useMissions, setUseMissions] = useState(true);
+  const [classicMap, setClassicMap] = useState(() => getMapStyle() === 'classic');
   const [error, setError] = useState('');
+
+  const toggleClassicMap = (val: boolean) => {
+    setClassicMap(val);
+    saveMapStyle(val ? 'classic' : 'modern');
+  };
 
   const displayName = user?.user_metadata?.display_name || user?.email?.split('@')[0] || 'Player';
 
@@ -134,6 +141,15 @@ export default function LobbyPage() {
                 </button>
                 <button onClick={() => setUseMissions(true)} className={`flex-1 py-2 rounded-lg text-xs font-medium transition-all ${useMissions ? 'bg-primary text-primary-foreground shadow-glow' : 'bg-secondary text-muted-foreground hover:text-foreground'}`}>
                   <Target size={13} className="inline mr-1" /> Secret Missions
+                </button>
+              </div>
+              {/* Map style */}
+              <div className="flex gap-2">
+                <button onClick={() => toggleClassicMap(false)} className={`flex items-center justify-center gap-1.5 flex-1 py-1.5 rounded-lg text-xs font-medium transition-all ${!classicMap ? 'bg-primary text-primary-foreground shadow-glow' : 'bg-secondary text-muted-foreground hover:text-foreground'}`}>
+                  <Map size={12} /> Modern Map
+                </button>
+                <button onClick={() => toggleClassicMap(true)} className={`flex items-center justify-center gap-1.5 flex-1 py-1.5 rounded-lg text-xs font-medium transition-all ${classicMap ? 'bg-primary text-primary-foreground shadow-glow' : 'bg-secondary text-muted-foreground hover:text-foreground'}`}>
+                  🗺 Classic Board
                 </button>
               </div>
               <button onClick={handleCreateGame} disabled={creating} className="w-full px-4 py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-bold hover:opacity-90 transition-opacity shadow-glow disabled:opacity-50">
