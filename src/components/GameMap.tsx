@@ -128,12 +128,7 @@ const PLAYER_HSL_DIM = [
 ];
 
 export default function GameMap({ multiplayer = false }: { multiplayer?: boolean }) {
-  const [classic, setClassicState] = useState(() => getMapStyle() === 'classic');
-  const toggleClassic = () => {
-    const next = !classic;
-    setClassicState(next);
-    saveMapStyle(next ? 'classic' : 'modern');
-  };
+  const classic = false;
   // Use the appropriate store based on mode
   const localStore = useGameStore();
   const mpStore = useMultiplayerStore();
@@ -285,16 +280,6 @@ export default function GameMap({ multiplayer = false }: { multiplayer?: boolean
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
     >
-      {/* Map style toggle button */}
-      <button
-        onClick={(e) => { e.stopPropagation(); toggleClassic(); }}
-        onMouseDown={(e) => e.stopPropagation()}
-        className="absolute top-2 right-2 z-10 px-2 py-1 text-xs font-semibold rounded-md bg-black/60 text-white border border-white/20 hover:bg-black/80 transition-colors select-none"
-        title="Toggle map style"
-      >
-        {classic ? 'Modern Map' : 'Classic Map'}
-      </button>
-
       {classic ? (
         /* ==================== CLASSIC MAP ==================== */
         <svg
