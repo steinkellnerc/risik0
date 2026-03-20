@@ -682,9 +682,10 @@ export const useMultiplayerStore = create<MultiplayerGameState>((set, get) => ({
     await delay(500);
 
     // Attack — recalculate after each conquest to chain opportunities
+    const aiMission = s.useMissions && s.gameId ? assignMissionsSeeded(s.gameId, 6)[s.currentPlayerIndex] : undefined;
     let attackRounds = 0;
-    while (attackRounds < 5 && get().winnerId === null) {
-      const attacks = aiDecideAttacks(s.currentPlayerIndex, get().territories);
+    while (attackRounds < 15 && get().winnerId === null) {
+      const attacks = aiDecideAttacks(s.currentPlayerIndex, get().territories, aiMission);
       if (attacks.length === 0) break;
       let madeAttack = false;
 

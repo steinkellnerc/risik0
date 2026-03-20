@@ -1,5 +1,5 @@
 import { TERRITORIES, TERRITORY_MAP, CONTINENTS } from './mapData';
-import { TerritoryState } from './types';
+import { TerritoryState, Mission } from './types';
 
 /**
  * Rule-based AI for Risk.
@@ -120,7 +120,8 @@ export interface AIAttackAction {
 
 export function aiDecideAttacks(
   playerIndex: number,
-  territories: Record<string, TerritoryState>
+  territories: Record<string, TerritoryState>,
+  mission?: Mission
 ): AIAttackAction[] {
   const attacks: AIAttackAction[] = [];
   const owned = getOwned(playerIndex, territories);
@@ -144,10 +145,23 @@ export function aiDecideAttacks(
         }
       }
 
+      // Mission-specific bonuses
+      let missionBonus = 0;
+      if (mission) {
+        if (mission.type === 'destroy_player' && mission.targetPlayerIndex !== undefined) {
+          // Heavily prioritize attacking the target player's territories
+          if (territories[adj].ownerId === mission.targetPlayerIndex) missionBonus = 8;
+        } else if (mission.type === 'conquer_continents' && mission.continents) {
+          // Prioritize territories in mission continents
+          const adjTerritory = TERRITORY_MAP.get(adj);
+          if (adjTerritory && mission.continents.includes(adjTerritory.continentId)) missionBonus = 6;
+        }
+      }
+
       // Eliminate weakened players (target has only 1 army = easy pick)
       const easyPickBonus = territories[adj].armies === 1 ? 2 : 0;
 
-      candidates.push({ source: tid, target: adj, ratio, score: ratio + continentBonus + easyPickBonus });
+      candidates.push({ source: tid, target: adj, ratio, score: ratio + continentBonus + missionBonus + easyPickBonus });
     }
   }
 
@@ -155,14 +169,14 @@ export function aiDecideAttacks(
   candidates.sort((a, b) => b.score - a.score);
 
   for (const c of candidates) {
-    // Attack if ratio >= 1.0 (equal or better odds), or at slight disadvantage for strong strategic motivation
-    if (c.ratio >= 1.0 || (c.score >= 3 && c.ratio >= 0.8)) {
+    // Attack anything where we're not heavily outnumbered (ratio >= 0.5)
+    // or where mission/strategic motivation is high enough to accept the odds
+    if (c.ratio >= 0.5 || c.score >= 4) {
       const maxDice = Math.min(3, territories[c.source].armies - 1);
       if (maxDice >= 1) {
         attacks.push({ type: 'attack', source: c.source, target: c.target, dice: maxDice });
       }
     }
-    if (attacks.length >= 12) break;
   }
 
   return attacks;
