@@ -747,10 +747,10 @@ export const useMultiplayerStore = create<MultiplayerGameState>((set, get) => ({
                 const ts = get().territories[a];
                 return ts && ts.ownerId === s.currentPlayerIndex && ts.armies > 1;
               });
-              if (srcEntry) {
-                const moveCount = Math.max(1, Math.floor((get().territories[srcEntry].armies - 1) / 2));
-                await get().moveArmiesAfterCapture(moveCount);
-              }
+              const moveCount = srcEntry
+                ? Math.max(1, Math.floor((get().territories[srcEntry].armies - 1) / 2))
+                : 1;
+              await get().moveArmiesAfterCapture(moveCount);
             }
             await delay(200);
             break; // recalculate after each capture
