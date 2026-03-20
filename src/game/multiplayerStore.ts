@@ -673,8 +673,35 @@ export const useMultiplayerStore = create<MultiplayerGameState>((set, get) => ({
     const player = s.players.find(p => p.slotIndex === s.currentPlayerIndex);
     if (!player?.isAi) return;
 
-    // Reinforce
-    const reinforceActions = aiReinforce(s.currentPlayerIndex, s.territories, s.reinforcementsLeft);
+    // Trade cards: mandatory when >= 5, opportunistic when >= 3
+    {
+      let aiPlayer = get().players.find(p => p.slotIndex === s.currentPlayerIndex)!;
+      let tradedOnce = false;
+      while (aiPlayer.cards.length >= 5 || (!tradedOnce && aiPlayer.cards.length >= 3)) {
+        const validSet = aiValidCardSet(aiPlayer.cards);
+        if (!validSet) break;
+        const bonus = getTradeInValue(get().tradeInCount);
+        const remaining = aiPlayer.cards.filter(c => !validSet.some(v => v.id === c.id));
+        const newArmies = get().reinforcementsLeft + bonus;
+        const newTradeIn = get().tradeInCount + 1;
+        set({
+          players: get().players.map(p =>
+            p.slotIndex === s.currentPlayerIndex ? { ...p, cards: remaining } : p
+          ),
+          reinforcementsLeft: newArmies,
+          tradeInCount: newTradeIn,
+        });
+        await updatePlayer(s.gameId, s.currentPlayerIndex, { cards: remaining, armies_to_place: newArmies });
+        await updateGame(s.gameId, { trade_in_count: newTradeIn });
+        await addGameLog(s.gameId, s.currentPlayerIndex, `AI traded cards for ${bonus} armies`, 'info');
+        await delay(300);
+        aiPlayer = get().players.find(p => p.slotIndex === s.currentPlayerIndex)!;
+        tradedOnce = true;
+      }
+    }
+
+    // Reinforce (use fresh state — reinforcementsLeft may have grown from card trades)
+    const reinforceActions = aiReinforce(s.currentPlayerIndex, get().territories, get().reinforcementsLeft);
     for (const action of reinforceActions) {
       await get().placeReinforcement(action.territoryId);
       await delay(200);
@@ -756,4 +783,20 @@ export const useMultiplayerStore = create<MultiplayerGameState>((set, get) => ({
 
 function delay(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function aiValidCardSet(cards: RiskCard[]): RiskCard[] | null {
+  for (let i = 0; i < cards.length - 2; i++)
+    for (let j = i + 1; j < cards.length - 1; j++)
+      for (let k = j + 1; k < cards.length; k++) {
+        const combo = [cards[i], cards[j], cards[k]];
+        const types = combo.map(c => c.type);
+        const wilds = types.filter(t => t === 'Wild').length;
+        const nonWild = types.filter(t => t !== 'Wild');
+        const valid = wilds >= 2 || wilds === 1 ||
+          (nonWild[0] === nonWild[1] && nonWild[1] === nonWild[2]) ||
+          new Set(nonWild).size === 3;
+        if (valid) return combo;
+      }
+  return null;
 }
