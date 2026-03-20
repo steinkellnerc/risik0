@@ -190,9 +190,9 @@ export default function ActionPanel() {
   const captureSource = capturedTerritory ? (() => {
     const t = TERRITORY_MAP.get(capturedTerritory);
     if (!t) return null;
-    const adj = t.adjacent.find(a =>
-      territories[a]?.ownerId === currentPlayerIndex && territories[a]?.armies > 1
-    );
+    const adj = t.adjacent
+      .filter(a => territories[a]?.ownerId === currentPlayerIndex && territories[a]?.armies > 1)
+      .sort((a, b) => territories[b].armies - territories[a].armies)[0];
     return adj ? territories[adj] : null;
   })() : null;
   const maxMoveIn = captureSource ? captureSource.armies - 1 : 1;
