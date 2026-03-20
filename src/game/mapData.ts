@@ -40,7 +40,7 @@ export const TERRITORIES: Territory[] = [
   { id: 'quebec', name: 'Quebec', continentId: 'north-america', cx: 250, cy: 110, adjacent: ['ontario', 'greenland', 'eastern-us'] },
   { id: 'western-us', name: 'Western US', continentId: 'north-america', cx: 130, cy: 175, adjacent: ['alberta', 'ontario', 'eastern-us', 'central-america'] },
   { id: 'eastern-us', name: 'Eastern US', continentId: 'north-america', cx: 200, cy: 190, adjacent: ['ontario', 'quebec', 'western-us', 'central-america'] },
-  { id: 'central-america', name: 'C. America', continentId: 'north-america', cx: 145, cy: 255, adjacent: ['western-us', 'eastern-us', 'venezuela'] },
+  { id: 'central-america', name: 'Central America', continentId: 'north-america', cx: 145, cy: 255, adjacent: ['western-us', 'eastern-us', 'venezuela'] },
 
   // South America
   { id: 'venezuela', name: 'Venezuela', continentId: 'south-america', cx: 195, cy: 305, adjacent: ['central-america', 'peru', 'brazil'] },
@@ -52,17 +52,17 @@ export const TERRITORIES: Territory[] = [
   { id: 'iceland', name: 'Iceland', continentId: 'europe', cx: 400, cy: 68, adjacent: ['greenland', 'scandinavia', 'great-britain'] },
   { id: 'scandinavia', name: 'Scandinavia', continentId: 'europe', cx: 480, cy: 72, adjacent: ['iceland', 'ukraine', 'northern-europe', 'great-britain'] },
   { id: 'great-britain', name: 'Great Britain', continentId: 'europe', cx: 400, cy: 130, adjacent: ['iceland', 'northern-europe', 'western-europe', 'scandinavia'] },
-  { id: 'northern-europe', name: 'N. Europe', continentId: 'europe', cx: 470, cy: 135, adjacent: ['scandinavia', 'great-britain', 'ukraine', 'western-europe', 'southern-europe'] },
-  { id: 'western-europe', name: 'W. Europe', continentId: 'europe', cx: 410, cy: 200, adjacent: ['great-britain', 'northern-europe', 'southern-europe', 'north-africa'] },
-  { id: 'southern-europe', name: 'S. Europe', continentId: 'europe', cx: 480, cy: 195, adjacent: ['northern-europe', 'western-europe', 'ukraine', 'north-africa', 'egypt', 'middle-east'] },
+  { id: 'northern-europe', name: 'Northern Europe', continentId: 'europe', cx: 470, cy: 135, adjacent: ['scandinavia', 'great-britain', 'ukraine', 'western-europe', 'southern-europe'] },
+  { id: 'western-europe', name: 'Western Europe', continentId: 'europe', cx: 410, cy: 200, adjacent: ['great-britain', 'northern-europe', 'southern-europe', 'north-africa'] },
+  { id: 'southern-europe', name: 'Southern Europe', continentId: 'europe', cx: 480, cy: 195, adjacent: ['northern-europe', 'western-europe', 'ukraine', 'north-africa', 'egypt', 'middle-east'] },
   { id: 'ukraine', name: 'Ukraine', continentId: 'europe', cx: 545, cy: 110, adjacent: ['scandinavia', 'northern-europe', 'southern-europe', 'ural', 'afghanistan', 'middle-east'] },
 
   // Africa
-  { id: 'north-africa', name: 'N. Africa', continentId: 'africa', cx: 430, cy: 300, adjacent: ['brazil', 'western-europe', 'southern-europe', 'egypt', 'east-africa', 'congo'] },
+  { id: 'north-africa', name: 'North Africa', continentId: 'africa', cx: 430, cy: 300, adjacent: ['brazil', 'western-europe', 'southern-europe', 'egypt', 'east-africa', 'congo'] },
   { id: 'egypt', name: 'Egypt', continentId: 'africa', cx: 500, cy: 275, adjacent: ['north-africa', 'southern-europe', 'east-africa', 'middle-east'] },
-  { id: 'east-africa', name: 'E. Africa', continentId: 'africa', cx: 520, cy: 350, adjacent: ['north-africa', 'egypt', 'congo', 'south-africa', 'madagascar', 'middle-east'] },
+  { id: 'east-africa', name: 'East Africa', continentId: 'africa', cx: 520, cy: 350, adjacent: ['north-africa', 'egypt', 'congo', 'south-africa', 'madagascar', 'middle-east'] },
   { id: 'congo', name: 'Congo', continentId: 'africa', cx: 480, cy: 380, adjacent: ['north-africa', 'east-africa', 'south-africa'] },
-  { id: 'south-africa', name: 'S. Africa', continentId: 'africa', cx: 490, cy: 445, adjacent: ['congo', 'east-africa', 'madagascar'] },
+  { id: 'south-africa', name: 'South Africa', continentId: 'africa', cx: 490, cy: 445, adjacent: ['congo', 'east-africa', 'madagascar'] },
   { id: 'madagascar', name: 'Madagascar', continentId: 'africa', cx: 555, cy: 440, adjacent: ['east-africa', 'south-africa'] },
 
   // Asia
@@ -82,8 +82,8 @@ export const TERRITORIES: Territory[] = [
   // Australia
   { id: 'indonesia', name: 'Indonesia', continentId: 'australia', cx: 760, cy: 370, adjacent: ['siam', 'new-guinea', 'western-australia'] },
   { id: 'new-guinea', name: 'New Guinea', continentId: 'australia', cx: 850, cy: 340, adjacent: ['indonesia', 'eastern-australia', 'western-australia'] },
-  { id: 'western-australia', name: 'W. Australia', continentId: 'australia', cx: 800, cy: 440, adjacent: ['indonesia', 'new-guinea', 'eastern-australia'] },
-  { id: 'eastern-australia', name: 'E. Australia', continentId: 'australia', cx: 875, cy: 430, adjacent: ['new-guinea', 'western-australia'] },
+  { id: 'western-australia', name: 'Western Australia', continentId: 'australia', cx: 800, cy: 440, adjacent: ['indonesia', 'new-guinea', 'eastern-australia'] },
+  { id: 'eastern-australia', name: 'Eastern Australia', continentId: 'australia', cx: 875, cy: 430, adjacent: ['new-guinea', 'western-australia'] },
 ];
 
 export const TERRITORY_MAP = new Map(TERRITORIES.map(t => [t.id, t]));
