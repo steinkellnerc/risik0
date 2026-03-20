@@ -420,15 +420,18 @@ export const useMultiplayerStore = create<MultiplayerGameState>((set, get) => ({
           `${s.players.find(p => p.slotIndex === defenderId)?.displayName || PLAYER_NAMES[defenderId]} eliminated!`, 'elimination');
       }
 
-      // Build updated eliminated array for mission checks
-      const eliminatedAfter = s.players.map(p =>
-        p.slotIndex === defenderId ? (defenderEliminated || p.eliminated) : p.eliminated
-      );
+      // Build eliminated array indexed by slotIndex for mission checks
+      const eliminatedAfter = Array(6).fill(false) as boolean[];
+      for (const p of s.players) {
+        eliminatedAfter[p.slotIndex] = p.slotIndex === defenderId
+          ? (defenderEliminated || p.eliminated)
+          : p.eliminated;
+      }
 
       // Check win: world domination
       if (checkWorldDomination(s.currentPlayerIndex, newTerritories)) {
         const winnerPlayer = s.players.find(p => p.slotIndex === s.currentPlayerIndex);
-        winnerId = winnerPlayer?.userId ?? null;
+        winnerId = winnerPlayer ? (winnerPlayer.userId ?? winnerPlayer.id) : null;
       }
 
       // Check win: missions
@@ -438,7 +441,7 @@ export const useMultiplayerStore = create<MultiplayerGameState>((set, get) => ({
         const attackerMission = missionMap[s.currentPlayerIndex];
         if (attackerMission && checkMissionComplete(s.currentPlayerIndex, attackerMission, newTerritories, eliminatedAfter)) {
           const winnerPlayer = s.players.find(p => p.slotIndex === s.currentPlayerIndex);
-          winnerId = winnerPlayer?.userId ?? null;
+          winnerId = winnerPlayer ? (winnerPlayer.userId ?? winnerPlayer.id) : null;
         }
         // If defender was eliminated, check all players with destroy_player missions targeting them
         if (!winnerId && defenderEliminated) {
@@ -446,7 +449,7 @@ export const useMultiplayerStore = create<MultiplayerGameState>((set, get) => ({
             if (p.slotIndex === s.currentPlayerIndex) continue;
             const m = missionMap[p.slotIndex];
             if (m && checkMissionComplete(p.slotIndex, m, newTerritories, eliminatedAfter)) {
-              winnerId = p.userId ?? null;
+              winnerId = p.userId ?? p.id;
               break;
             }
           }
@@ -609,10 +612,11 @@ export const useMultiplayerStore = create<MultiplayerGameState>((set, get) => ({
       if (s.useMissions && s.gameId) {
         const missionMap = assignMissionsSeeded(s.gameId, s.players.length);
         const mission = missionMap[s.currentPlayerIndex];
-        const eliminated = s.players.map(p => p.eliminated);
+        const eliminated = Array(6).fill(false) as boolean[];
+        for (const p of s.players) eliminated[p.slotIndex] = p.eliminated;
         if (mission && checkMissionComplete(s.currentPlayerIndex, mission, s.territories, eliminated)) {
           const winnerPlayer = s.players.find(p => p.slotIndex === s.currentPlayerIndex);
-          const wId = winnerPlayer?.userId ?? null;
+          const wId = winnerPlayer ? (winnerPlayer.userId ?? winnerPlayer.id) : null;
           if (wId) {
             set({ winnerId: wId });
             await updateGame(s.gameId, { winner_id: wId, status: 'finished' });
@@ -730,7 +734,7 @@ export const useMultiplayerStore = create<MultiplayerGameState>((set, get) => ({
     await delay(500);
 
     // Attack — recalculate after each conquest to chain opportunities
-    const aiMission = s.useMissions && s.gameId ? assignMissionsSeeded(s.gameId, 6)[s.currentPlayerIndex] : undefined;
+    const aiMission = s.useMissions && s.gameId ? assignMissionsSeeded(s.gameId, s.players.length)[s.currentPlayerIndex] : undefined;
     let attackRounds = 0;
     while (attackRounds < 15 && get().winnerId === null) {
       const attacks = aiDecideAttacks(s.currentPlayerIndex, get().territories, aiMission);

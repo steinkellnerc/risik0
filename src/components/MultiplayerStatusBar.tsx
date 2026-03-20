@@ -32,7 +32,7 @@ export default function MultiplayerStatusBar() {
   };
 
   if (winnerId) {
-    const winner = players.find(p => p.userId === winnerId);
+    const winner = players.find(p => p.userId === winnerId || p.id === winnerId);
     return (
       <div className="bg-surface shadow-elevated px-4 py-5 flex flex-col items-center gap-4">
         <span className="text-2xl font-bold text-foreground">
