@@ -160,7 +160,7 @@ export default function MultiplayerActionPanel() {
   const {
     phase, currentPlayerIndex, reinforcementsLeft, attackSource, attackTarget,
     fortifySource, fortifyTarget, lastDiceRoll, territories, players, awaitingMoveIn,
-    capturedTerritory, endPhase, executeAttack, executeFortify, moveArmiesAfterCapture,
+    capturedTerritory, minMoveIn, endPhase, executeAttack, executeFortify, moveArmiesAfterCapture,
     tradeInCards, log, isMyTurn, mySlotIndex,
   } = useMultiplayerStore();
 
@@ -169,8 +169,8 @@ export default function MultiplayerActionPanel() {
   const [selectedCardIds, setSelectedCardIds] = useState<string[]>([]);
   const [mobileExpanded, setMobileExpanded] = useState(true);
 
-  // Reset move-in slider whenever a new capture happens
-  useEffect(() => { if (awaitingMoveIn) setMoveCount(1); }, [awaitingMoveIn]);
+  // Reset move-in slider to the required minimum whenever a new capture happens
+  useEffect(() => { if (awaitingMoveIn) setMoveCount(minMoveIn); }, [awaitingMoveIn, minMoveIn]);
   // Reset fortify slider when selections change (after each fortify move or new selection)
   useEffect(() => { setFortifyCount(1); }, [fortifySource, fortifyTarget]);
 
@@ -309,13 +309,13 @@ export default function MultiplayerActionPanel() {
               <div className="bg-secondary rounded-lg p-3 space-y-3">
                 <p className="text-xs text-foreground font-medium">Territory captured! Move armies in:</p>
                 <div className="flex items-center gap-2">
-                  <input type="range" min={1} max={Math.max(1, maxMoveIn)}
-                    value={Math.min(moveCount, Math.max(1, maxMoveIn))}
+                  <input type="range" min={minMoveIn} max={Math.max(minMoveIn, maxMoveIn)}
+                    value={Math.max(minMoveIn, Math.min(moveCount, Math.max(minMoveIn, maxMoveIn)))}
                     onChange={e => setMoveCount(Number(e.target.value))}
                     className="flex-1 accent-primary" />
-                  <span className="font-mono-tabular text-sm text-foreground w-8 text-right">{Math.min(moveCount, Math.max(1, maxMoveIn))}</span>
+                  <span className="font-mono-tabular text-sm text-foreground w-8 text-right">{Math.max(minMoveIn, Math.min(moveCount, Math.max(minMoveIn, maxMoveIn)))}</span>
                 </div>
-                <button onClick={() => { moveArmiesAfterCapture(Math.min(moveCount, Math.max(1, maxMoveIn))); setMoveCount(1); }}
+                <button onClick={() => { moveArmiesAfterCapture(Math.max(minMoveIn, Math.min(moveCount, Math.max(minMoveIn, maxMoveIn)))); setMoveCount(minMoveIn); }}
                   className="w-full px-3 py-1.5 bg-primary text-primary-foreground rounded-md text-xs font-medium hover:opacity-90 transition-opacity">
                   Move In
                 </button>

@@ -81,6 +81,7 @@ export interface GameStore extends GameState {
   deck: RiskCard[];
   capturedTerritory: string | null;
   awaitingMoveIn: boolean;
+  minMoveIn: number;
 }
 
 export const useGameStore = create<GameStore>((set, get) => ({
@@ -104,6 +105,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   deck: [],
   capturedTerritory: null,
   awaitingMoveIn: false,
+  minMoveIn: 1,
   missions: {},
   useMissions: false,
 
@@ -161,6 +163,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       deck: createDeck(),
       capturedTerritory: null,
       awaitingMoveIn: false,
+      minMoveIn: 1,
       missions,
       useMissions,
     });
@@ -316,6 +319,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       winner,
       capturedTerritory: captured ? targetName : null,
       awaitingMoveIn: captured,
+      minMoveIn: captured ? attackDice : 1,
       attackSource: captured ? null : s.attackSource,
       attackTarget: captured ? null : s.attackTarget,
     });
@@ -331,7 +335,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
     if (!lastSource) return;
     const [sourceId, sourceState] = lastSource;
     const maxMove = sourceState.armies - 1;
-    count = Math.max(1, Math.min(count, maxMove));
+    // Must move at least as many armies as attack dice used (capped at maxMove if source ran low)
+    count = Math.max(Math.min(s.minMoveIn, maxMove), Math.min(count, maxMove));
 
     set({
       territories: {

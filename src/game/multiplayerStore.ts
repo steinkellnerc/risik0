@@ -74,6 +74,7 @@ export interface MultiplayerGameState {
   lastDiceRoll: { attacker: number[]; defender: number[] } | null;
   capturedTerritory: string | null;
   awaitingMoveIn: boolean;
+  minMoveIn: number;
   reinforcementsLeft: number;
 
   // Log
@@ -128,6 +129,7 @@ export const useMultiplayerStore = create<MultiplayerGameState>((set, get) => ({
   lastDiceRoll: null,
   capturedTerritory: null,
   awaitingMoveIn: false,
+  minMoveIn: 1,
   reinforcementsLeft: 0,
 
   // Log
@@ -459,6 +461,7 @@ export const useMultiplayerStore = create<MultiplayerGameState>((set, get) => ({
       hasConqueredThisTurn: s.hasConqueredThisTurn || result.captured,
       capturedTerritory: result.captured ? targetName : null,
       awaitingMoveIn: result.captured,
+      minMoveIn: result.captured ? attackDice : 1,
       attackSource: result.captured ? null : s.attackSource,
       attackTarget: result.captured ? null : s.attackTarget,
     });
@@ -499,7 +502,8 @@ export const useMultiplayerStore = create<MultiplayerGameState>((set, get) => ({
 
     const sourceState = s.territories[sourceId];
     const maxMove = sourceState.armies - 1;
-    count = Math.max(1, Math.min(count, maxMove));
+    // Must move at least as many armies as attack dice used (capped at maxMove if source ran low)
+    count = Math.max(Math.min(s.minMoveIn, maxMove), Math.min(count, maxMove));
 
     // Optimistic update
     set({
