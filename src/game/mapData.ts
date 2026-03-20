@@ -70,7 +70,7 @@ export const TERRITORIES: Territory[] = [
   { id: 'siberia', name: 'Siberia', continentId: 'asia', cx: 700, cy: 60, adjacent: ['ural', 'yakutsk', 'irkutsk', 'mongolia', 'china'] },
   { id: 'yakutsk', name: 'Yakutsk', continentId: 'asia', cx: 775, cy: 45, adjacent: ['siberia', 'irkutsk', 'kamchatka'] },
   { id: 'kamchatka', name: 'Kamchatka', continentId: 'asia', cx: 860, cy: 60, adjacent: ['yakutsk', 'irkutsk', 'mongolia', 'japan', 'alaska'] },
-  { id: 'irkutsk', name: 'Irkutsk', continentId: 'asia', cx: 800, cy: 130, adjacent: ['siberia', 'yakutsk', 'kamchatka', 'mongolia'] },
+  { id: 'irkutsk', name: 'Irkutsk', continentId: 'asia', cx: 755, cy: 108, adjacent: ['siberia', 'yakutsk', 'kamchatka', 'mongolia'] },
   { id: 'mongolia', name: 'Mongolia', continentId: 'asia', cx: 765, cy: 155, adjacent: ['siberia', 'irkutsk', 'kamchatka', 'japan', 'china'] },
   { id: 'japan', name: 'Japan', continentId: 'asia', cx: 860, cy: 155, adjacent: ['kamchatka', 'mongolia'] },
   { id: 'afghanistan', name: 'Afghanistan', continentId: 'asia', cx: 625, cy: 165, adjacent: ['ukraine', 'ural', 'china', 'india', 'middle-east'] },
