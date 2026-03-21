@@ -78,6 +78,42 @@ function ContinentBorders() {
   );
 }
 
+// Card trading legend
+function CardTradingLegend() {
+  return (
+    <g>
+      {/* Background */}
+      <rect x="10" y="295" width="132" height="115" rx="4" fill="hsl(222, 40%, 8%)" stroke="hsl(210, 50%, 50%)" strokeWidth="1.2" opacity="0.95" />
+
+      {/* Title */}
+      <text x="76" y="310" textAnchor="middle" fill="hsl(210, 80%, 70%)" fontSize="10" fontWeight="bold" fontFamily="IBM Plex Sans, sans-serif">
+        Card Trading
+      </text>
+
+      {/* Divider */}
+      <line x1="15" y1="315" x2="137" y2="315" stroke="hsl(210, 50%, 40%)" strokeWidth="0.6" />
+
+      {/* Valid sets */}
+      <g fontSize="7.5" fontFamily="IBM Plex Mono, monospace">
+        <text x="16" y="326" fill="hsl(210, 50%, 55%)">Valid sets:</text>
+        <text x="16" y="337" fill="hsl(210, 70%, 65%)">  3 of a kind</text>
+        <text x="16" y="347" fill="hsl(210, 70%, 65%)">  1 of each type</text>
+        <text x="16" y="357" fill="hsl(210, 70%, 65%)">  Wild = any type</text>
+      </g>
+
+      {/* Divider */}
+      <line x1="15" y1="362" x2="137" y2="362" stroke="hsl(210, 50%, 40%)" strokeWidth="0.6" />
+
+      {/* Trade-in values */}
+      <g fontSize="7.5" fontFamily="IBM Plex Mono, monospace">
+        <text x="16" y="373" fill="hsl(210, 50%, 55%)">Troops earned:</text>
+        <text x="16" y="384" fill="hsl(48, 96%, 53%)">4, 6, 8, 10, 12, 15</text>
+        <text x="16" y="394" fill="hsl(48, 96%, 53%)">then +5 each trade</text>
+      </g>
+    </g>
+  );
+}
+
 // Continent bonus table
 function ContinentBonusTable() {
   return (
@@ -378,6 +414,7 @@ export default function GameMap({ multiplayer = false }: { multiplayer?: boolean
 
             <ConnectionLines />
             <ContinentBorders />
+            <CardTradingLegend />
             <ContinentBonusTable />
 
             {TERRITORIES.map(t => {
