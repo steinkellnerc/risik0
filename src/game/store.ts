@@ -329,8 +329,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const s = get();
     if (!s.capturedTerritory || !s.awaitingMoveIn) return;
     const lastSource = Object.entries(s.territories)
-      .find(([id, t]) => t.ownerId === s.currentPlayerIndex && t.armies > 1 &&
-        TERRITORIES.find(tt => tt.id === id)?.adjacent.includes(s.capturedTerritory!));
+      .filter(([id, t]) => t.ownerId === s.currentPlayerIndex && t.armies > 1 &&
+        TERRITORIES.find(tt => tt.id === id)?.adjacent.includes(s.capturedTerritory!))
+      .sort(([, a], [, b]) => b.armies - a.armies)[0];
 
     if (!lastSource) return;
     const [sourceId, sourceState] = lastSource;
@@ -415,6 +416,15 @@ export const useGameStore = create<GameStore>((set, get) => ({
       set({ phase: 'FORTIFY', fortifySource: null, fortifyTarget: null, attackSource: null, attackTarget: null });
       get().addLog('Fortify phase');
     } else if (s.phase === 'FORTIFY') {
+      // Check mission completion after fortify (e.g. 18 territories with 2 armies)
+      if (s.useMissions && s.missions[s.currentPlayerIndex]) {
+        const eliminated = s.players.map(p => p.eliminated);
+        if (checkMissionComplete(s.currentPlayerIndex, s.missions[s.currentPlayerIndex], s.territories, eliminated)) {
+          set({ winner: s.currentPlayerIndex });
+          get().addLog(`${PLAYER_NAMES[s.currentPlayerIndex]} completed their secret mission!`);
+          return;
+        }
+      }
       let next = (s.currentPlayerIndex + 1) % 6;
       while (s.players[next].eliminated) {
         next = (next + 1) % 6;
