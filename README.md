@@ -22,7 +22,6 @@ A web-based implementation of the classic Risk strategy board game. Play locally
 | Layer | Tools |
 |-------|-------|
 | UI | React, Tailwind CSS, Radix UI, Framer Motion |
-| State | Zustand |
 | Routing | React Router |
 | Backend | Supabase (Auth, Postgres, Realtime) |
 | Build | Vite, TypeScript, ESLint |
