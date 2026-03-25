@@ -519,6 +519,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       get().selectFortifySource(fortifyAction.source);
       get().selectFortifyTarget(fortifyAction.target);
       get().executeFortify(fortifyAction.count);
+      get().endPhase();
     } else {
       get().endPhase(); // skip fortify
     }

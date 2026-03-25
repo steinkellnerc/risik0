@@ -96,7 +96,7 @@ function CardTradingLegend() {
       {/* Valid sets */}
       <g fontSize="7.5" fontFamily="IBM Plex Mono, monospace">
         <text x="16" y="326" fill="hsl(210, 50%, 55%)">Valid sets:</text>
-        <text x="16" y="337" fill="hsl(210, 70%, 65%)">  3 of a kind</text>
+        <text x="16" y="337" fill="hsl(210, 70%, 65%)">  3 of same type</text>
         <text x="16" y="347" fill="hsl(210, 70%, 65%)">  1 of each type</text>
         <text x="16" y="357" fill="hsl(210, 70%, 65%)">  Wild = any type</text>
       </g>
