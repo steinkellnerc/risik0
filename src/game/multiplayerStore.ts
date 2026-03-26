@@ -341,26 +341,26 @@ export const useMultiplayerStore = create<MultiplayerGameState>((set, get) => ({
     if (!s.isMyTurn && !s.players.find(p => p.slotIndex === s.currentPlayerIndex)?.isAi) return;
     if (s.territories[territoryId]?.ownerId !== s.currentPlayerIndex) return;
 
+    const newArmies = s.territories[territoryId].armies + 1;
+    const newLeft = s.reinforcementsLeft - 1;
+
     // Optimistic update
     set({
       territories: {
         ...s.territories,
-        [territoryId]: { ...s.territories[territoryId], armies: s.territories[territoryId].armies + 1 },
+        [territoryId]: { ...s.territories[territoryId], armies: newArmies },
       },
-      reinforcementsLeft: s.reinforcementsLeft - 1,
+      reinforcementsLeft: newLeft,
     });
 
-    // Write to DB
-    await updateTerritory(s.gameId, territoryId, {
-      army_count: s.territories[territoryId].armies + 1,
-    });
-    await updatePlayer(s.gameId, s.currentPlayerIndex, {
-      armies_to_place: s.reinforcementsLeft - 1,
-    });
-    await addGameLog(s.gameId, s.currentPlayerIndex, `Reinforced ${territoryId}`, 'reinforce');
+    // Write territory + player in parallel (no per-click log — too slow and noisy)
+    await Promise.all([
+      updateTerritory(s.gameId, territoryId, { army_count: newArmies }),
+      updatePlayer(s.gameId, s.currentPlayerIndex, { armies_to_place: newLeft }),
+    ]);
 
     // Auto-advance to attack phase when all reinforcements placed
-    if (s.reinforcementsLeft - 1 === 0) {
+    if (newLeft === 0) {
       await get().endPhase();
     }
   },
