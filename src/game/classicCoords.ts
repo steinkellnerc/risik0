@@ -9,8 +9,8 @@ export const CLASSIC_COORDS: Record<string, { cx: number; cy: number }> = {
   'northwest-territory':  { cx: 118, cy: 122 },
   'greenland':            { cx: 248, cy: 92  },
   'alberta':              { cx: 78,  cy: 210 },
-  'ontario':              { cx: 162, cy: 200 },  // slightly right
-  'quebec':               { cx: 235, cy: 192 },  // down and right
+  'ontario':              { cx: 182, cy: 200 },
+  'quebec':               { cx: 252, cy: 212 },
   'western-us':           { cx: 78,  cy: 278 },
   'eastern-us':           { cx: 145, cy: 270 },
   'central-america':      { cx: 78,  cy: 348 },
@@ -18,12 +18,12 @@ export const CLASSIC_COORDS: Record<string, { cx: number; cy: number }> = {
   // South America
   'venezuela':            { cx: 148, cy: 412 },
   'brazil':               { cx: 155, cy: 478 },
-  'peru':                 { cx: 112, cy: 455 },
-  'argentina':            { cx: 112, cy: 562 },
+  'peru':                 { cx: 95,  cy: 472 },
+  'argentina':            { cx: 112, cy: 592 },
 
   // Europe
-  'iceland':              { cx: 308, cy: 155 },  // separated from scandinavia
-  'scandinavia':          { cx: 355, cy: 185 },  // moved down
+  'iceland':              { cx: 322, cy: 155 },
+  'scandinavia':          { cx: 355, cy: 205 },
   'great-britain':        { cx: 268, cy: 300 },
   'northern-europe':      { cx: 348, cy: 292 },
   'western-europe':       { cx: 280, cy: 352 },
@@ -32,7 +32,7 @@ export const CLASSIC_COORDS: Record<string, { cx: number; cy: number }> = {
 
   // Africa
   'north-africa':         { cx: 278, cy: 468 },
-  'egypt':                { cx: 365, cy: 415 },
+  'egypt':                { cx: 365, cy: 432 },
   'east-africa':          { cx: 390, cy: 478 },
   'congo':                { cx: 355, cy: 525 },
   'south-africa':         { cx: 355, cy: 582 },
@@ -40,12 +40,12 @@ export const CLASSIC_COORDS: Record<string, { cx: number; cy: number }> = {
 
   // Asia
   'ural':                 { cx: 487, cy: 228 },  // right
-  'siberia':              { cx: 533, cy: 175 },  // right
-  'yakutsk':              { cx: 573, cy: 128 },  // right
-  'irkutsk':              { cx: 573, cy: 242 },  // right
-  'kamchatka':            { cx: 648, cy: 162 },  // right
+  'siberia':              { cx: 552, cy: 175 },
+  'yakutsk':              { cx: 595, cy: 128 },
+  'irkutsk':              { cx: 585, cy: 242 },
+  'kamchatka':            { cx: 665, cy: 178 },
   'mongolia':             { cx: 605, cy: 322 },
-  'japan':                { cx: 658, cy: 272 },  // down
+  'japan':                { cx: 658, cy: 295 },
   'afghanistan':          { cx: 470, cy: 315 },
   'china':                { cx: 568, cy: 360 },  // left and down
   'india':                { cx: 515, cy: 410 },
@@ -54,7 +54,7 @@ export const CLASSIC_COORDS: Record<string, { cx: number; cy: number }> = {
 
   // Australia
   'indonesia':            { cx: 620, cy: 472 },
-  'new-guinea':           { cx: 662, cy: 475 },
+  'new-guinea':           { cx: 662, cy: 492 },
   'western-australia':    { cx: 612, cy: 558 },
   'eastern-australia':    { cx: 660, cy: 542 },
 };
