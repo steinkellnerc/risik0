@@ -1,61 +1,60 @@
 /**
- * Territory center coordinates mapped to the classic Risiko board image (risk-map-dots.jpg).
- * The board image is rendered at 720×720. Coordinates are calibrated to the red dots
- * the user painted at each territory's center on the reference image.
- * Fine-tune cx/cy here if any circle drifts off its dot.
+ * Territory center coordinates for the classic Risiko board (risk-map-dots.jpg).
+ * SVG viewBox is 720×720. Calibrated from the red dots painted on the reference image.
+ * Fine-tune individual cx/cy values if a circle is off its dot.
  */
 export const CLASSIC_COORDS: Record<string, { cx: number; cy: number }> = {
   // North America
-  'alaska':               { cx: 78,  cy: 138 },
-  'northwest-territory':  { cx: 157, cy: 115 },
-  'greenland':            { cx: 290, cy: 65  },
-  'alberta':              { cx: 122, cy: 195 },
-  'ontario':              { cx: 194, cy: 178 },
-  'quebec':               { cx: 252, cy: 150 },
-  'western-us':           { cx: 100, cy: 255 },
-  'eastern-us':           { cx: 178, cy: 238 },
-  'central-america':      { cx: 115, cy: 318 },
+  'alaska':               { cx: 55,  cy: 145 },
+  'northwest-territory':  { cx: 118, cy: 122 },
+  'greenland':            { cx: 248, cy: 92  },
+  'alberta':              { cx: 78,  cy: 210 },
+  'ontario':              { cx: 148, cy: 200 },
+  'quebec':               { cx: 210, cy: 170 },
+  'western-us':           { cx: 78,  cy: 278 },
+  'eastern-us':           { cx: 145, cy: 270 },
+  'central-america':      { cx: 78,  cy: 348 },
 
   // South America
-  'venezuela':            { cx: 163, cy: 375 },
-  'brazil':               { cx: 208, cy: 427 },
-  'peru':                 { cx: 130, cy: 448 },
-  'argentina':            { cx: 158, cy: 512 },
+  'venezuela':            { cx: 148, cy: 412 },
+  'brazil':               { cx: 155, cy: 478 },
+  'peru':                 { cx: 112, cy: 455 },
+  'argentina':            { cx: 112, cy: 562 },
 
   // Europe
-  'iceland':              { cx: 312, cy: 80  },
-  'scandinavia':          { cx: 390, cy: 88  },
-  'great-britain':        { cx: 304, cy: 168 },
-  'northern-europe':      { cx: 374, cy: 182 },
-  'western-europe':       { cx: 318, cy: 240 },
-  'southern-europe':      { cx: 384, cy: 230 },
-  'ukraine':              { cx: 453, cy: 143 },
+  'iceland':              { cx: 315, cy: 172 },
+  'scandinavia':          { cx: 345, cy: 142 },
+  'great-britain':        { cx: 268, cy: 300 },
+  'northern-europe':      { cx: 348, cy: 292 },
+  'western-europe':       { cx: 280, cy: 352 },
+  'southern-europe':      { cx: 320, cy: 348 },
+  'ukraine':              { cx: 382, cy: 228 },
 
   // Africa
-  'north-africa':         { cx: 311, cy: 342 },
-  'egypt':                { cx: 392, cy: 297 },
-  'east-africa':          { cx: 444, cy: 376 },
-  'congo':                { cx: 387, cy: 413 },
-  'south-africa':         { cx: 400, cy: 475 },
-  'madagascar':           { cx: 483, cy: 460 },
+  'north-africa':         { cx: 278, cy: 468 },
+  'egypt':                { cx: 365, cy: 415 },
+  'east-africa':          { cx: 390, cy: 478 },
+  'congo':                { cx: 355, cy: 525 },
+  'south-africa':         { cx: 355, cy: 582 },
+  'madagascar':           { cx: 458, cy: 572 },
 
   // Asia
-  'ural':                 { cx: 492, cy: 138 },
-  'siberia':              { cx: 542, cy: 97  },
-  'yakutsk':              { cx: 608, cy: 81  },
-  'irkutsk':              { cx: 606, cy: 160 },
-  'kamchatka':            { cx: 663, cy: 107 },
-  'mongolia':             { cx: 593, cy: 228 },
-  'japan':                { cx: 669, cy: 170 },
-  'afghanistan':          { cx: 496, cy: 203 },
-  'china':                { cx: 583, cy: 243 },
-  'india':                { cx: 520, cy: 311 },
-  'middle-east':          { cx: 447, cy: 296 },
-  'siam':                 { cx: 619, cy: 317 },
+  'ural':                 { cx: 462, cy: 228 },
+  'siberia':              { cx: 508, cy: 175 },
+  'yakutsk':              { cx: 548, cy: 128 },
+  'irkutsk':              { cx: 548, cy: 242 },
+  'kamchatka':            { cx: 622, cy: 162 },
+  'mongolia':             { cx: 605, cy: 322 },
+  'japan':                { cx: 658, cy: 248 },
+  'afghanistan':          { cx: 470, cy: 315 },
+  'china':                { cx: 588, cy: 345 },
+  'india':                { cx: 515, cy: 410 },
+  'middle-east':          { cx: 428, cy: 410 },
+  'siam':                 { cx: 618, cy: 410 },
 
   // Australia
-  'indonesia':            { cx: 592, cy: 402 },
-  'new-guinea':           { cx: 656, cy: 366 },
-  'western-australia':    { cx: 596, cy: 480 },
-  'eastern-australia':    { cx: 658, cy: 458 },
+  'indonesia':            { cx: 620, cy: 472 },
+  'new-guinea':           { cx: 662, cy: 475 },
+  'western-australia':    { cx: 612, cy: 558 },
+  'eastern-australia':    { cx: 660, cy: 542 },
 };

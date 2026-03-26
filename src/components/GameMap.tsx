@@ -322,12 +322,10 @@ export default function GameMap({ multiplayer = false }: { multiplayer?: boolean
           className="w-full h-full"
           preserveAspectRatio="xMidYMid meet"
         >
-          {/* Classic Risiko board image */}
-          <image href="/risk-map-dots.jpg" x="0" y="0" width="720" height="720"
-            preserveAspectRatio="xMidYMid meet" />
-
-          {/* All map content — panned and zoomed */}
+          {/* All map content — panned and zoomed (image inside so it moves with circles) */}
           <g transform={`translate(${transform.x},${transform.y}) scale(${transform.scale})`}>
+            <image href="/risk-map-dots.jpg" x="0" y="0" width="720" height="720"
+              preserveAspectRatio="xMidYMid meet" />
             {TERRITORIES.map(t => {
               const coords = CLASSIC_COORDS[t.id];
               if (!coords) return null;
