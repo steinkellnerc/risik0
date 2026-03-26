@@ -302,11 +302,25 @@ export const useGameStore = create<GameStore>((set, get) => ({
       const allOwned = Object.values(newTerritories).every(t => t.ownerId === s.currentPlayerIndex);
       if (allOwned) {
         winner = s.currentPlayerIndex;
-      } else if (s.useMissions && s.missions[s.currentPlayerIndex]) {
+      } else if (s.useMissions) {
         const eliminated = newPlayers.map(p => p.eliminated);
-        if (checkMissionComplete(s.currentPlayerIndex, s.missions[s.currentPlayerIndex], newTerritories, eliminated)) {
+        // Check attacker's mission
+        if (s.missions[s.currentPlayerIndex] && checkMissionComplete(s.currentPlayerIndex, s.missions[s.currentPlayerIndex], newTerritories, eliminated)) {
           winner = s.currentPlayerIndex;
           get().addLog(`🎯 ${PLAYER_NAMES[s.currentPlayerIndex]} completed their secret mission!`);
+        }
+        // If defender was just eliminated, check all other players whose mission is to destroy them
+        if (winner === null && newPlayers[defenderId].eliminated) {
+          for (let p = 0; p < newPlayers.length; p++) {
+            if (p === s.currentPlayerIndex) continue;
+            if (newPlayers[p].eliminated) continue;
+            const m = s.missions[p];
+            if (m && checkMissionComplete(p, m, newTerritories, eliminated)) {
+              winner = p;
+              get().addLog(`🎯 ${PLAYER_NAMES[p]} completed their secret mission!`);
+              break;
+            }
+          }
         }
       }
     }
