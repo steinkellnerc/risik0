@@ -41,16 +41,16 @@ export const CLASSIC_COORDS: Record<string, { cx: number; cy: number }> = {
   // Asia
   'ural':                 { cx: 487, cy: 228 },  // right
   'siberia':              { cx: 552, cy: 175 },
-  'yakutsk':              { cx: 595, cy: 128 },
+  'yakutsk':              { cx: 612, cy: 128 },
   'irkutsk':              { cx: 585, cy: 242 },
-  'kamchatka':            { cx: 665, cy: 178 },
+  'kamchatka':            { cx: 665, cy: 198 },
   'mongolia':             { cx: 605, cy: 322 },
-  'japan':                { cx: 658, cy: 295 },
+  'japan':                { cx: 658, cy: 318 },
   'afghanistan':          { cx: 470, cy: 315 },
   'china':                { cx: 568, cy: 360 },  // left and down
   'india':                { cx: 515, cy: 410 },
   'middle-east':          { cx: 428, cy: 410 },
-  'siam':                 { cx: 592, cy: 410 },  // left
+  'siam':                 { cx: 575, cy: 428 },
 
   // Australia
   'indonesia':            { cx: 620, cy: 472 },
