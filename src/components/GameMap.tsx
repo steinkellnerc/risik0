@@ -38,6 +38,40 @@ function ConnectionLines() {
   );
 }
 
+// Connection lines for the classic map using CLASSIC_COORDS
+function ClassicConnectionLines() {
+  const drawn = new Set<string>();
+  const lines: { x1: number; y1: number; x2: number; y2: number; wrap?: boolean }[] = [];
+
+  for (const t of TERRITORIES) {
+    for (const adjId of t.adjacent) {
+      const key = [t.id, adjId].sort().join('-');
+      if (drawn.has(key)) continue;
+      drawn.add(key);
+      const src = CLASSIC_COORDS[t.id];
+      const dst = CLASSIC_COORDS[adjId];
+      if (!src || !dst) continue;
+
+      // Alaska–Kamchatka: draw stub lines to each edge
+      if ((t.id === 'alaska' && adjId === 'kamchatka') || (t.id === 'kamchatka' && adjId === 'alaska')) {
+        lines.push({ x1: src.cx, y1: src.cy, x2: 0,   y2: src.cy, wrap: true });
+        lines.push({ x1: dst.cx, y1: dst.cy, x2: 720, y2: dst.cy, wrap: true });
+      } else {
+        lines.push({ x1: src.cx, y1: src.cy, x2: dst.cx, y2: dst.cy });
+      }
+    }
+  }
+
+  return (
+    <g className="opacity-50">
+      {lines.map((l, i) => (
+        <line key={i} x1={l.x1} y1={l.y1} x2={l.x2} y2={l.y2}
+          stroke="hsl(210, 60%, 55%)" strokeWidth="1.2" strokeDasharray={l.wrap ? "3,3" : undefined} />
+      ))}
+    </g>
+  );
+}
+
 // Continent boundary lines
 function ContinentBorders() {
   const continentLineColors = {
@@ -333,6 +367,7 @@ export default function GameMap({ multiplayer = false }: { multiplayer?: boolean
           <g transform={`translate(${transform.x},${transform.y}) scale(${transform.scale})`}>
             <image href="/risk-map-dots.jpg" x="0" y="0" width="720" height="720"
               preserveAspectRatio="xMidYMid meet" />
+            <ClassicConnectionLines />
             {TERRITORIES.map(t => {
               const coords = CLASSIC_COORDS[t.id];
               if (!coords) return null;

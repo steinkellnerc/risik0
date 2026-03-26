@@ -1,6 +1,6 @@
 /**
  * Territory center coordinates for the classic Risiko board (risk-map-dots.jpg).
- * SVG viewBox is 720×720. Calibrated from the red dots painted on the reference image.
+ * SVG viewBox is 720×720. Calibrated to the red dots painted on the reference image.
  * Fine-tune individual cx/cy values if a circle is off its dot.
  */
 export const CLASSIC_COORDS: Record<string, { cx: number; cy: number }> = {
@@ -9,8 +9,8 @@ export const CLASSIC_COORDS: Record<string, { cx: number; cy: number }> = {
   'northwest-territory':  { cx: 118, cy: 122 },
   'greenland':            { cx: 248, cy: 92  },
   'alberta':              { cx: 78,  cy: 210 },
-  'ontario':              { cx: 148, cy: 200 },
-  'quebec':               { cx: 210, cy: 170 },
+  'ontario':              { cx: 162, cy: 200 },  // slightly right
+  'quebec':               { cx: 235, cy: 192 },  // down and right
   'western-us':           { cx: 78,  cy: 278 },
   'eastern-us':           { cx: 145, cy: 270 },
   'central-america':      { cx: 78,  cy: 348 },
@@ -22,13 +22,13 @@ export const CLASSIC_COORDS: Record<string, { cx: number; cy: number }> = {
   'argentina':            { cx: 112, cy: 562 },
 
   // Europe
-  'iceland':              { cx: 315, cy: 172 },
-  'scandinavia':          { cx: 345, cy: 142 },
+  'iceland':              { cx: 308, cy: 155 },  // separated from scandinavia
+  'scandinavia':          { cx: 355, cy: 185 },  // moved down
   'great-britain':        { cx: 268, cy: 300 },
   'northern-europe':      { cx: 348, cy: 292 },
   'western-europe':       { cx: 280, cy: 352 },
-  'southern-europe':      { cx: 320, cy: 348 },
-  'ukraine':              { cx: 382, cy: 228 },
+  'southern-europe':      { cx: 348, cy: 348 },  // moved right
+  'ukraine':              { cx: 415, cy: 228 },  // moved right
 
   // Africa
   'north-africa':         { cx: 278, cy: 468 },
@@ -39,18 +39,18 @@ export const CLASSIC_COORDS: Record<string, { cx: number; cy: number }> = {
   'madagascar':           { cx: 458, cy: 572 },
 
   // Asia
-  'ural':                 { cx: 462, cy: 228 },
-  'siberia':              { cx: 508, cy: 175 },
-  'yakutsk':              { cx: 548, cy: 128 },
-  'irkutsk':              { cx: 548, cy: 242 },
-  'kamchatka':            { cx: 622, cy: 162 },
+  'ural':                 { cx: 487, cy: 228 },  // right
+  'siberia':              { cx: 533, cy: 175 },  // right
+  'yakutsk':              { cx: 573, cy: 128 },  // right
+  'irkutsk':              { cx: 573, cy: 242 },  // right
+  'kamchatka':            { cx: 648, cy: 162 },  // right
   'mongolia':             { cx: 605, cy: 322 },
-  'japan':                { cx: 658, cy: 248 },
+  'japan':                { cx: 658, cy: 272 },  // down
   'afghanistan':          { cx: 470, cy: 315 },
-  'china':                { cx: 588, cy: 345 },
+  'china':                { cx: 568, cy: 360 },  // left and down
   'india':                { cx: 515, cy: 410 },
   'middle-east':          { cx: 428, cy: 410 },
-  'siam':                 { cx: 618, cy: 410 },
+  'siam':                 { cx: 592, cy: 410 },  // left
 
   // Australia
   'indonesia':            { cx: 620, cy: 472 },
