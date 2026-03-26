@@ -103,11 +103,15 @@ export default function MultiplayerGamePage() {
   const handleDeleteGame = async () => {
     if (!gameId) return;
     setIsDeleting(true);
-    // Navigate away first so the user isn't stuck on a broken screen
-    disconnect();
-    navigate('/lobby');
-    // Cancel in background — best effort
-    cancelGame(gameId).catch(err => console.error('Cancel game failed:', err));
+    setError('');
+    try {
+      await cancelGame(gameId);
+      disconnect();
+      navigate('/lobby');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete game');
+      setIsDeleting(false);
+    }
   };
 
   const handleStartGame = async () => {
