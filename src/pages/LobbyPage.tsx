@@ -215,7 +215,7 @@ export default function LobbyPage() {
               <span className="text-sm font-semibold text-foreground flex items-center gap-2">
                 <Users size={14} /> Join a Game
               </span>
-              <button onClick={refreshGames} disabled={loading} className="p-1.5 text-muted-foreground hover:text-foreground rounded-md hover:bg-secondary transition-colors">
+              <button type="button" onClick={refreshGames} disabled={loading} aria-label="Refresh games" className="p-1.5 text-muted-foreground hover:text-foreground rounded-md hover:bg-secondary transition-colors">
                 <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
               </button>
             </div>
