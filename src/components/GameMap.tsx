@@ -4,7 +4,6 @@ import { useGameStore } from '../game/store';
 import { useMultiplayerStore } from '../game/multiplayerStore';
 import { TERRITORIES, TERRITORY_MAP, CONTINENT_COLORS, CONTINENTS } from '../game/mapData';
 import { CLASSIC_COORDS } from '../game/classicCoords';
-import { getMapStyle, saveMapStyle } from '../lib/mapStyle';
 
 // Connection lines between adjacent territories
 function ConnectionLines() {
@@ -306,8 +305,7 @@ export default function GameMap({ multiplayer = false }: { multiplayer?: boolean
   return (
     <div
       ref={containerRef}
-      className="w-full h-full overflow-hidden select-none relative"
-      style={{ cursor: dragRef.current.dragging ? 'grabbing' : 'grab' }}
+      className={`w-full h-full overflow-hidden select-none relative ${dragRef.current.dragging ? 'cursor-grabbing' : 'cursor-grab'}`}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
