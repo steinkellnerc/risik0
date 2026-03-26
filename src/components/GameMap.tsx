@@ -4,6 +4,7 @@ import { useGameStore } from '../game/store';
 import { useMultiplayerStore } from '../game/multiplayerStore';
 import { TERRITORIES, TERRITORY_MAP, CONTINENT_COLORS, CONTINENTS } from '../game/mapData';
 import { CLASSIC_COORDS } from '../game/classicCoords';
+import { getMapStyle, saveMapStyle } from '../lib/mapStyle';
 
 // Connection lines between adjacent territories
 function ConnectionLines() {
@@ -163,7 +164,8 @@ const PLAYER_HSL_DIM = [
 ];
 
 export default function GameMap({ multiplayer = false }: { multiplayer?: boolean }) {
-  const classic = false;
+  const [classic, setClassic] = useState(() => getMapStyle() === 'classic');
+  const toggleMapStyle = () => { const n = !classic; setClassic(n); saveMapStyle(n ? 'classic' : 'modern'); };
   // Use the appropriate store based on mode
   const localStore = useGameStore();
   const mpStore = useMultiplayerStore();
@@ -314,6 +316,11 @@ export default function GameMap({ multiplayer = false }: { multiplayer?: boolean
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
     >
+      <button type="button" onClick={toggleMapStyle} aria-label="Toggle map style"
+        className="absolute top-2 right-2 z-10 px-2 py-1 text-xs font-medium bg-black/50 text-white rounded-md hover:bg-black/70 transition-colors">
+        {classic ? 'Modern' : 'Classic'}
+      </button>
+
       {classic ? (
         /* ==================== CLASSIC MAP ==================== */
         <svg
