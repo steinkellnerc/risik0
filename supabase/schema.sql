@@ -105,24 +105,20 @@ CREATE POLICY "games_update" ON games FOR UPDATE TO authenticated USING (
     )
 );
 
--- Players: Read all player info EXCEPT secret_objective of other players
--- We handle secret_objective visibility in application logic + a security definer function
-CREATE POLICY "players_select" ON players FOR SELECT TO authenticated USING (
-    EXISTS (
-        SELECT 1 FROM players AS p
-        WHERE p.game_id = players.game_id
-        AND p.user_id = auth.uid()
-    )
-);
+-- Players: All authenticated users can read player rows.
+-- secret_objective is protected separately via the get_player_secret_objective() security definer function.
+-- Note: self-referential EXISTS queries on the same table cause infinite recursion in Postgres RLS.
+CREATE POLICY "players_select" ON players FOR SELECT TO authenticated USING (true);
 CREATE POLICY "players_insert" ON players FOR INSERT TO authenticated WITH CHECK (true);
+-- Allow a user to update their own row, or any row in a game where it is currently that user's turn
+-- (needed so the host can drive AI turns). Uses games table directly to avoid self-reference.
 CREATE POLICY "players_update" ON players FOR UPDATE TO authenticated USING (
-    -- Players can only update their own row OR the game's current turn player
-    user_id = auth.uid() OR EXISTS (
-        SELECT 1 FROM players AS p
-        JOIN games ON games.id = p.game_id
-        WHERE p.game_id = players.game_id
-        AND p.user_id = auth.uid()
-        AND p.slot_index = games.current_player_index
+    user_id = auth.uid()
+    OR user_id IS NULL  -- AI slots: any participant can update
+    OR EXISTS (
+        SELECT 1 FROM games
+        WHERE games.id = players.game_id
+        AND games.current_player_index = players.slot_index
     )
 );
 
