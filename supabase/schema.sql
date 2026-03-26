@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS games (
     trade_in_count INTEGER NOT NULL DEFAULT 0,
     has_conquered_this_turn BOOLEAN NOT NULL DEFAULT FALSE,
     use_missions BOOLEAN NOT NULL DEFAULT FALSE,
+    host_user_id UUID REFERENCES auth.users(id),
     winner_id UUID REFERENCES auth.users(id),
     last_move_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );

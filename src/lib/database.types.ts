@@ -20,6 +20,7 @@ export interface Database {
           trade_in_count: number;
           has_conquered_this_turn: boolean;
           use_missions: boolean;
+          host_user_id: string | null;
           winner_id: string | null;
           last_move_at: string;
         };
@@ -33,6 +34,7 @@ export interface Database {
           trade_in_count?: number;
           has_conquered_this_turn?: boolean;
           use_missions?: boolean;
+          host_user_id?: string | null;
           winner_id?: string | null;
           last_move_at?: string;
         };
@@ -46,6 +48,7 @@ export interface Database {
           trade_in_count?: number;
           has_conquered_this_turn?: boolean;
           use_missions?: boolean;
+          host_user_id?: string | null;
           winner_id?: string | null;
           last_move_at?: string;
         };
