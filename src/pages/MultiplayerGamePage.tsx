@@ -138,10 +138,10 @@ export default function MultiplayerGamePage() {
   // Connecting screen
   if (!connected || mySlotIndex === null) {
     return (
-      <div className="h-screen bg-background flex flex-col items-center justify-center gap-4 px-4">
+      <div className="h-screen-safe bg-background flex flex-col items-center justify-center gap-4 px-4 p-safe">
         <button
           onClick={() => navigate('/lobby')}
-          className="absolute top-4 left-4 flex items-center gap-1.5 px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground bg-secondary rounded-lg transition-colors"
+          className="absolute top-4 left-4 flex items-center gap-1.5 px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground bg-secondary rounded-lg transition-colors pt-safe pl-safe"
         >
           <ArrowLeft size={13} /> Back to Lobby
         </button>
@@ -173,7 +173,7 @@ export default function MultiplayerGamePage() {
       : [{ id: 'me', slotIndex: mySlotIndex ?? 0, displayName, color: '', userId: user?.id ?? null, isAi: false, armiesToPlace: 0, eliminated: false, secretObjective: null, cards: [] }];
 
     return (
-      <div className="h-screen bg-background flex flex-col overflow-y-auto">
+      <div className="h-screen-safe bg-background flex flex-col overflow-y-auto pt-safe pb-safe">
         {/* Top bar */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
           <button
@@ -302,7 +302,7 @@ export default function MultiplayerGamePage() {
 
   // Active game view
   return (
-    <div className="h-screen bg-background flex flex-col overflow-hidden">
+    <div className="h-screen-safe bg-background flex flex-col overflow-hidden pt-safe pb-safe">
       <MultiplayerStatusBar />
       <div className="flex-1 flex flex-col md:flex-row overflow-hidden min-h-0">
         <div className="flex-1 min-h-0 overflow-hidden">

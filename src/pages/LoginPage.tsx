@@ -36,7 +36,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="h-screen bg-background flex flex-col items-center justify-center px-4">
+    <div className="h-screen-safe bg-background flex flex-col items-center justify-center px-4 p-safe">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}

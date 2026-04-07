@@ -105,7 +105,7 @@ export default function LobbyPage() {
   );
 
   return (
-    <div className="h-screen bg-background flex flex-col overflow-hidden">
+    <div className="h-screen-safe bg-background flex flex-col overflow-hidden pt-safe pb-safe">
 
       {/* Fixed top — header + create game */}
       <div className="flex-none border-b border-border bg-background px-4 pt-5 pb-4">

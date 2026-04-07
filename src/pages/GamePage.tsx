@@ -12,7 +12,7 @@ export default function GamePage() {
   }
 
   return (
-    <div className="h-screen bg-background flex flex-col overflow-hidden">
+    <div className="h-screen-safe bg-background flex flex-col overflow-hidden pt-safe pb-safe">
       <StatusBar />
       <div className="flex-1 flex flex-col md:flex-row overflow-hidden min-h-0">
         <div className="flex-1 min-h-0 overflow-hidden">

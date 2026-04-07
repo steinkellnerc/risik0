@@ -13,7 +13,7 @@ export default function GameSetup() {
   const [humanCount, setHumanCount] = useState(2);
   const [useMissions, setUseMissions] = useState(true);
   return (
-    <div className="h-screen bg-background flex flex-col items-center justify-center px-4">
+    <div className="h-screen-safe bg-background flex flex-col items-center justify-center px-4 p-safe overflow-y-auto">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}

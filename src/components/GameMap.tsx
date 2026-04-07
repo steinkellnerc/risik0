@@ -342,6 +342,7 @@ export default function GameMap({ multiplayer = false }: { multiplayer?: boolean
     <div
       ref={containerRef}
       className={`w-full h-full overflow-hidden select-none relative ${dragRef.current.dragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+      style={{ touchAction: 'none' }}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}

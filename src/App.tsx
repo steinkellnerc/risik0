@@ -18,7 +18,7 @@ function RequireAuth({ children }: { children: ReactNode }) {
 
   if (loading) {
     return (
-      <div className="h-screen bg-background flex items-center justify-center">
+      <div className="h-screen-safe bg-background flex items-center justify-center">
         <div className="text-muted-foreground animate-pulse">Loading...</div>
       </div>
     );
@@ -33,7 +33,7 @@ function AppRoutes() {
 
   if (loading) {
     return (
-      <div className="h-screen bg-background flex items-center justify-center">
+      <div className="h-screen-safe bg-background flex items-center justify-center">
         <div className="text-muted-foreground animate-pulse">Loading...</div>
       </div>
     );
