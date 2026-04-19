@@ -5,6 +5,7 @@ import { useMultiplayerStore } from '../game/multiplayerStore';
 import { TERRITORIES, TERRITORY_MAP, CONTINENT_COLORS, CONTINENTS } from '../game/mapData';
 import { CLASSIC_COORDS } from '../game/classicCoords';
 import { getMapStyle, saveMapStyle } from '../lib/mapStyle';
+import { useIsMobile } from '../hooks/use-mobile';
 
 // Connection lines between adjacent territories
 function ConnectionLines() {
@@ -200,6 +201,10 @@ const PLAYER_HSL_DIM = [
 export default function GameMap({ multiplayer = false }: { multiplayer?: boolean }) {
   const [classic, setClassic] = useState(() => getMapStyle() === 'classic');
   const toggleMapStyle = () => { const n = !classic; setClassic(n); saveMapStyle(n ? 'classic' : 'modern'); };
+  const isMobile = useIsMobile();
+  const baseR = isMobile ? 20 : 16;
+  const activeR = isMobile ? 24 : 20;
+  const potentialR = isMobile ? 23 : 19;
   // Use the appropriate store based on mode
   const localStore = useGameStore();
   const mpStore = useMultiplayerStore();
@@ -391,13 +396,13 @@ export default function GameMap({ multiplayer = false }: { multiplayer?: boolean
                 <g key={t.id} onClick={() => !dragRef.current.moved && handleTerritoryClick(t.id)}
                   className={canInteract ? 'cursor-pointer' : 'cursor-default'}>
                   {isTarget && (
-                    <motion.circle cx={cx} cy={cy} r={27}
+                    <motion.circle cx={cx} cy={cy} r={activeR + 7}
                       fill="none" stroke="hsl(0, 84%, 60%)"
                       strokeWidth={2} strokeDasharray="4,3"
                       className="animate-pulse-territory" />
                   )}
                   <motion.circle
-                    cx={cx} cy={cy} r={isSource ? 20 : isPotentialSource ? 19 : isTarget ? 20 : 16}
+                    cx={cx} cy={cy} r={isSource ? activeR : isPotentialSource ? potentialR : isTarget ? activeR : baseR}
                     fill={dimColor}
                     stroke={isSource ? color : isTarget ? 'hsl(0, 84%, 60%)' : isPotentialSource ? 'hsl(48, 96%, 53%)' : color}
                     strokeWidth={isSource || isTarget || isPotentialSource ? 2.5 : 1.2}
@@ -476,7 +481,7 @@ export default function GameMap({ multiplayer = false }: { multiplayer?: boolean
                   className={canInteract ? 'cursor-pointer' : 'cursor-default'}>
                   {isTarget && (
                     <motion.circle
-                      cx={t.cx} cy={t.cy} r={27}
+                      cx={t.cx} cy={t.cy} r={activeR + 7}
                       fill="none"
                       stroke="hsl(0, 84%, 60%)"
                       strokeWidth={2}
@@ -485,7 +490,7 @@ export default function GameMap({ multiplayer = false }: { multiplayer?: boolean
                     />
                   )}
                   <motion.circle
-                    cx={t.cx} cy={t.cy} r={isSource ? 20 : isPotentialSource ? 19 : isTarget ? 20 : 16}
+                    cx={t.cx} cy={t.cy} r={isSource ? activeR : isPotentialSource ? potentialR : isTarget ? activeR : baseR}
                     fill={dimColor}
                     stroke={isSource ? color : isTarget ? 'hsl(0, 84%, 60%)' : isPotentialSource ? 'hsl(48, 96%, 53%)' : color}
                     strokeWidth={isSource || isTarget || isPotentialSource ? 2.5 : 1.2}

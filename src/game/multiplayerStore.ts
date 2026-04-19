@@ -4,6 +4,9 @@
  * All mutations write to Supabase; Realtime pushes updates back.
  */
 
+// Prevents concurrent AI turns (race between realtime trigger and explicit call)
+let aiTurnRunning = false;
+
 import { create } from 'zustand';
 import type { Phase, TerritoryState, RiskCard } from './types';
 import { PLAYER_NAMES } from './types';
@@ -260,7 +263,7 @@ export const useMultiplayerStore = create<MultiplayerGameState>((set, get) => ({
         // Trigger AI turn if needed
         const currentP = s.players.find(p => p.slotIndex === newCurrentPlayer);
         if (currentP?.isAi && game.status === 'ACTIVE' && game.turn_phase === 'REINFORCE') {
-          setTimeout(() => get().runAITurn(), 1000);
+          setTimeout(() => { if (!aiTurnRunning) get().runAITurn(); }, 500);
         }
       },
       onPlayerUpdate: (dbPlayer) => {
@@ -317,7 +320,7 @@ export const useMultiplayerStore = create<MultiplayerGameState>((set, get) => ({
     // Auto-trigger AI if it's AI's turn on connect
     const currentP = players.find(p => p.slotIndex === currentPlayerIndex);
     if (currentP?.isAi && state.game.status === 'ACTIVE') {
-      setTimeout(() => get().runAITurn(), 1000);
+      setTimeout(() => { if (!aiTurnRunning) get().runAITurn(); }, 500);
     }
   },
 
@@ -694,111 +697,119 @@ export const useMultiplayerStore = create<MultiplayerGameState>((set, get) => ({
     if (s.myUserId !== s.hostUserId) return;
     const player = s.players.find(p => p.slotIndex === s.currentPlayerIndex);
     if (!player?.isAi) return;
+    if (aiTurnRunning) return;
 
-    // Trade cards: mandatory when >= 5, opportunistic when >= 3
-    {
-      let aiPlayer = get().players.find(p => p.slotIndex === s.currentPlayerIndex)!;
-      let tradedOnce = false;
-      while (aiPlayer.cards.length >= 5 || (!tradedOnce && aiPlayer.cards.length >= 3)) {
-        const validSet = aiValidCardSet(aiPlayer.cards);
-        if (!validSet) break;
-        const bonus = getTradeInValue(get().tradeInCount);
-        const remaining = aiPlayer.cards.filter(c => !validSet.some(v => v.id === c.id));
-        const newArmies = get().reinforcementsLeft + bonus;
-        const newTradeIn = get().tradeInCount + 1;
-        set({
-          players: get().players.map(p =>
-            p.slotIndex === s.currentPlayerIndex ? { ...p, cards: remaining } : p
-          ),
-          reinforcementsLeft: newArmies,
-          tradeInCount: newTradeIn,
-        });
-        await updatePlayer(s.gameId, s.currentPlayerIndex, { cards: remaining, armies_to_place: newArmies });
-        await updateGame(s.gameId, { trade_in_count: newTradeIn });
-        await addGameLog(s.gameId, s.currentPlayerIndex, `AI traded cards for ${bonus} armies`, 'info');
-        await delay(300);
-        aiPlayer = get().players.find(p => p.slotIndex === s.currentPlayerIndex)!;
-        tradedOnce = true;
+    aiTurnRunning = true;
+    try {
+      // Trade cards: mandatory when >= 5, opportunistic when >= 3
+      {
+        let aiPlayer = get().players.find(p => p.slotIndex === s.currentPlayerIndex)!;
+        let tradedOnce = false;
+        while (aiPlayer.cards.length >= 5 || (!tradedOnce && aiPlayer.cards.length >= 3)) {
+          const validSet = aiValidCardSet(aiPlayer.cards);
+          if (!validSet) break;
+          const bonus = getTradeInValue(get().tradeInCount);
+          const remaining = aiPlayer.cards.filter(c => !validSet.some(v => v.id === c.id));
+          const newArmies = get().reinforcementsLeft + bonus;
+          const newTradeIn = get().tradeInCount + 1;
+          set({
+            players: get().players.map(p =>
+              p.slotIndex === s.currentPlayerIndex ? { ...p, cards: remaining } : p
+            ),
+            reinforcementsLeft: newArmies,
+            tradeInCount: newTradeIn,
+          });
+          await updatePlayer(s.gameId!, s.currentPlayerIndex, { cards: remaining, armies_to_place: newArmies });
+          await updateGame(s.gameId!, { trade_in_count: newTradeIn });
+          await addGameLog(s.gameId!, s.currentPlayerIndex, `AI traded cards for ${bonus} armies`, 'info');
+          await delay(80);
+          aiPlayer = get().players.find(p => p.slotIndex === s.currentPlayerIndex)!;
+          tradedOnce = true;
+        }
       }
-    }
 
-    // Reinforce (use fresh state — reinforcementsLeft may have grown from card trades)
-    const reinforceActions = aiReinforce(s.currentPlayerIndex, get().territories, get().reinforcementsLeft);
-    for (const action of reinforceActions) {
-      await get().placeReinforcement(action.territoryId);
-      await delay(200);
-    }
+      // Reinforce (use fresh state — reinforcementsLeft may have grown from card trades)
+      const reinforceActions = aiReinforce(s.currentPlayerIndex, get().territories, get().reinforcementsLeft);
+      for (const action of reinforceActions) {
+        await get().placeReinforcement(action.territoryId);
+        await delay(50);
+      }
 
-    // End reinforce → attack (placeReinforcement auto-advances on last placement, avoid double-advance)
-    if (get().phase === 'REINFORCE') {
-      await get().endPhase();
-    }
-    await delay(500);
+      // End reinforce → attack (placeReinforcement auto-advances on last placement, avoid double-advance)
+      if (get().phase === 'REINFORCE') {
+        await get().endPhase();
+      }
+      await delay(150);
 
-    // Attack — recalculate after each conquest to chain opportunities
-    const aiMission = s.useMissions && s.gameId ? assignMissionsSeeded(s.gameId, s.players.length)[s.currentPlayerIndex] : undefined;
-    let attackRounds = 0;
-    while (attackRounds < 15 && get().winnerId === null) {
-      const attacks = aiDecideAttacks(s.currentPlayerIndex, get().territories, aiMission);
-      if (attacks.length === 0) break;
-      let madeAttack = false;
+      // Attack — recalculate after each conquest to chain opportunities
+      const aiMission = s.useMissions && s.gameId ? assignMissionsSeeded(s.gameId, s.players.length)[s.currentPlayerIndex] : undefined;
+      let attackRounds = 0;
+      while (attackRounds < 15 && get().winnerId === null) {
+        const attacks = aiDecideAttacks(s.currentPlayerIndex, get().territories, aiMission);
+        if (attacks.length === 0) break;
+        let madeAttack = false;
 
-      for (const attack of attacks) {
-        const currentTerritories = get().territories;
-        const src = currentTerritories[attack.source];
-        const tgt = currentTerritories[attack.target];
-        if (!src || !tgt || src.ownerId !== s.currentPlayerIndex || tgt.ownerId === s.currentPlayerIndex) continue;
-        if (src.armies < 2) continue;
+        for (const attack of attacks) {
+          const currentTerritories = get().territories;
+          const src = currentTerritories[attack.source];
+          const tgt = currentTerritories[attack.target];
+          if (!src || !tgt || src.ownerId !== s.currentPlayerIndex || tgt.ownerId === s.currentPlayerIndex) continue;
+          if (src.armies < 2) continue;
 
-        get().selectAttackSource(attack.source);
-        get().selectAttackTarget(attack.target);
-        await delay(300);
+          get().selectAttackSource(attack.source);
+          get().selectAttackTarget(attack.target);
+          await delay(80);
 
-        const maxDice = Math.min(3, get().territories[attack.source].armies - 1);
-        const defDice = Math.min(2, get().territories[attack.target].armies);
-        if (maxDice >= 1 && defDice >= 1) {
-          await get().executeAttack(maxDice, defDice);
-          await delay(400);
-          madeAttack = true;
+          const maxDice = Math.min(3, get().territories[attack.source].armies - 1);
+          const defDice = Math.min(2, get().territories[attack.target].armies);
+          if (maxDice >= 1 && defDice >= 1) {
+            await get().executeAttack(maxDice, defDice);
+            await delay(100);
+            madeAttack = true;
 
-          if (get().awaitingMoveIn && get().capturedTerritory) {
-            const capturedTerr = get().capturedTerritory!;
-            const t = TERRITORY_MAP.get(capturedTerr);
-            if (t) {
-              const srcEntry = t.adjacent.find(a => {
-                const ts = get().territories[a];
-                return ts && ts.ownerId === s.currentPlayerIndex && ts.armies > 1;
-              });
-              const moveCount = srcEntry
-                ? Math.max(1, Math.floor((get().territories[srcEntry].armies - 1) / 2))
-                : 1;
-              await get().moveArmiesAfterCapture(moveCount);
+            if (get().awaitingMoveIn && get().capturedTerritory) {
+              const capturedTerr = get().capturedTerritory!;
+              const t = TERRITORY_MAP.get(capturedTerr);
+              if (t) {
+                const srcEntry = t.adjacent.find(a => {
+                  const ts = get().territories[a];
+                  return ts && ts.ownerId === s.currentPlayerIndex && ts.armies > 1;
+                });
+                const moveCount = srcEntry
+                  ? Math.max(1, Math.floor((get().territories[srcEntry].armies - 1) / 2))
+                  : 1;
+                await get().moveArmiesAfterCapture(moveCount);
+              }
+              await delay(50);
+              break; // recalculate after each capture
             }
-            await delay(200);
-            break; // recalculate after each capture
           }
+
+          if (get().winnerId !== null) return;
         }
 
-        if (get().winnerId !== null) return;
+        if (!madeAttack) break;
+        attackRounds++;
       }
 
-      if (!madeAttack) break;
-      attackRounds++;
-    }
+      // End attack → fortify
+      await get().endPhase();
+      await delay(80);
 
-    // End attack → fortify
-    await get().endPhase();
-    await delay(200);
-
-    // Fortify
-    const fortifyAction = aiFortify(s.currentPlayerIndex, get().territories);
-    if (fortifyAction) {
-      get().selectFortifySource(fortifyAction.source);
-      get().selectFortifyTarget(fortifyAction.target);
-      await get().executeFortify(fortifyAction.count);
+      // Fortify
+      const fortifyAction = aiFortify(s.currentPlayerIndex, get().territories);
+      if (fortifyAction) {
+        get().selectFortifySource(fortifyAction.source);
+        get().selectFortifyTarget(fortifyAction.target);
+        await get().executeFortify(fortifyAction.count);
+      }
+      // Always end the fortify phase (executeFortify no longer auto-advances)
+      await get().endPhase();
+    } catch (err) {
+      console.error('[AI] runAITurn error:', err);
+    } finally {
+      aiTurnRunning = false;
     }
-    // Always end the fortify phase (executeFortify no longer auto-advances)
-    await get().endPhase();
   },
 }));
 

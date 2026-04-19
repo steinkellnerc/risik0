@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
+import { Drawer as DrawerPrimitive } from 'vaul';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useMultiplayerStore } from '../game/multiplayerStore';
 import { TERRITORY_MAP } from '../game/mapData';
 import type { RiskCard } from '../game/types';
-import { Swords, Shield, Move, ChevronRight, Dices, Target, Clock, History, ScrollText, ChevronDown, ChevronUp } from 'lucide-react';
+import { useIsMobile } from '../hooks/use-mobile';
+import { Swords, Shield, Move, ChevronRight, Dices, Target, Clock, History, ScrollText } from 'lucide-react';
 
 function isValidSet(cards: RiskCard[]): boolean {
   if (cards.length !== 3) return false;
@@ -168,7 +170,7 @@ export default function MultiplayerActionPanel() {
   const [moveCount, setMoveCount] = useState(1);
   const [fortifyCount, setFortifyCount] = useState(1);
   const [selectedCardIds, setSelectedCardIds] = useState<string[]>([]);
-  const [mobileExpanded, setMobileExpanded] = useState(true);
+  const isMobile = useIsMobile();
 
   // Reset move-in slider to the required minimum whenever a new capture happens
   useEffect(() => { if (awaitingMoveIn) setMoveCount(minMoveIn); }, [awaitingMoveIn, minMoveIn]);
@@ -200,45 +202,41 @@ export default function MultiplayerActionPanel() {
   // Secret mission for current user
   const myMission = myPlayer?.secretObjective;
 
-  return (
-    <div className="w-full md:w-72 bg-surface md:h-full flex flex-col shadow-elevated border-t md:border-t-0 md:border-l border-border">
-      {/* Header — acts as mobile toggle */}
-      <div
-        className="p-3 md:p-4 border-b border-border cursor-pointer md:cursor-default"
-        onClick={() => setMobileExpanded(v => !v)}
-      >
-        <div className="flex items-center gap-2">
-          <div className={`w-2.5 h-2.5 rounded-full bg-player-${currentPlayerIndex + 1}`} />
-          <span className="text-sm font-semibold text-foreground flex-1">
-            {currentPlayer?.isAi ? 'AI ' : ''}{currentPlayer?.displayName}
-          </span>
-          <span className="text-xs font-semibold text-primary">{phase}</span>
-          {isMyTurn && phase === 'REINFORCE' && reinforcementsLeft > 0 && (
-            <span className="font-mono-tabular text-primary text-sm ml-1">+{reinforcementsLeft}</span>
-          )}
-          {!isMyTurn && <Clock size={11} className="text-muted-foreground ml-1" />}
-          <span className="md:hidden ml-1 text-muted-foreground">
-            {mobileExpanded ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
-          </span>
-        </div>
-        <p className="text-xs text-muted-foreground mt-0.5 hidden md:block">
-          {isMyTurn
-            ? phase === 'REINFORCE' && (myPlayer?.cards ?? []).length >= 5
-              ? 'Trade in cards before placing troops.'
-              : phase === 'REINFORCE'
-              ? `Place ${reinforcementsLeft} reinforcements.`
-              : phase === 'ATTACK'
-              ? 'Select source, then target.'
-              : 'Move armies or skip.'
-            : currentPlayer?.isAi
-            ? 'AI is thinking...'
-            : `Waiting for ${currentPlayer?.displayName}...`}
-        </p>
+  const header = (
+    <div className="p-3 border-b border-border shrink-0">
+      <div className="flex items-center gap-2">
+        <div className={`w-2.5 h-2.5 rounded-full bg-player-${currentPlayerIndex + 1}`} />
+        <span className="text-sm font-semibold text-foreground flex-1">
+          {currentPlayer?.isAi ? 'AI ' : ''}{currentPlayer?.displayName}
+        </span>
+        <span className="text-xs font-semibold text-primary">{phase}</span>
+        {isMyTurn && phase === 'REINFORCE' && reinforcementsLeft > 0 && (
+          <span className="font-mono-tabular text-primary text-sm ml-1">+{reinforcementsLeft}</span>
+        )}
+        {!isMyTurn && <Clock size={11} className="text-muted-foreground ml-1" />}
       </div>
+      <p className="text-xs text-muted-foreground mt-0.5">
+        {isMyTurn
+          ? phase === 'REINFORCE' && (myPlayer?.cards ?? []).length >= 5
+            ? 'Trade in cards before placing troops.'
+            : phase === 'REINFORCE'
+            ? `Place ${reinforcementsLeft} reinforcements.`
+            : phase === 'ATTACK'
+            ? 'Select source, then target.'
+            : 'Move armies or skip.'
+          : currentPlayer?.isAi
+          ? 'AI is thinking...'
+          : `Waiting for ${currentPlayer?.displayName}...`}
+      </p>
+    </div>
+  );
 
-      {/* Secret Mission — always visible, outside collapsible */}
+  const body = (
+    <div className="flex flex-col flex-1 overflow-hidden min-h-0">
+
+      {/* Secret Mission */}
       {myMission && (
-        <div className="px-3 py-2 border-b-2 border-primary/30 bg-primary/10 flex flex-col gap-1">
+        <div className="px-3 py-2 border-b-2 border-primary/30 bg-primary/10 flex flex-col gap-1 shrink-0">
           <div className="flex items-center gap-1.5">
             <Target size={12} className="text-primary shrink-0" />
             <span className="text-xs font-bold text-primary uppercase tracking-wide">Your Mission</span>
@@ -246,9 +244,6 @@ export default function MultiplayerActionPanel() {
           <p className="text-xs text-foreground leading-snug">{myMission}</p>
         </div>
       )}
-
-      {/* Collapsible body */}
-      <div className={`${mobileExpanded ? 'flex' : 'hidden'} md:flex flex-col flex-1 overflow-hidden max-h-[50vh] md:max-h-full`}>
 
       {/* Cards — always visible to the local player, interactive only on their turn */}
       {myPlayer && (
@@ -413,8 +408,8 @@ export default function MultiplayerActionPanel() {
         )}
       </div>
 
-      {/* Game Log — desktop only */}
-      <div className="hidden md:block border-t border-border p-3 max-h-40 overflow-y-auto">
+      {/* Game Log */}
+      <div className="border-t border-border p-3 max-h-40 overflow-y-auto shrink-0">
         <div className="flex items-center gap-1.5 mb-1.5">
           <History size={11} className="text-muted-foreground" />
           <span className="text-xs text-muted-foreground font-semibold">HISTORY</span>
@@ -430,8 +425,31 @@ export default function MultiplayerActionPanel() {
           ))}
         </div>
       </div>
+    </div>
+  );
 
-      </div>{/* end collapsible body */}
+  if (isMobile) {
+    return (
+      <DrawerPrimitive.Root open onOpenChange={() => {}} modal={false} snapPoints={[0.14, 0.72]} defaultSnap={0.14} dismissible={false}>
+        <DrawerPrimitive.Portal>
+          <DrawerPrimitive.Content className="fixed inset-x-0 bottom-0 z-40 flex flex-col bg-surface rounded-t-2xl border-t border-border pb-safe" style={{ maxHeight: '72vh' }}>
+            <div className="flex justify-center py-2 shrink-0">
+              <div className="h-1.5 w-10 rounded-full bg-muted-foreground/30" />
+            </div>
+            {header}
+            <div className="flex-1 overflow-y-auto min-h-0">
+              {body}
+            </div>
+          </DrawerPrimitive.Content>
+        </DrawerPrimitive.Portal>
+      </DrawerPrimitive.Root>
+    );
+  }
+
+  return (
+    <div className="w-72 bg-surface h-full flex flex-col shadow-elevated border-l border-border">
+      {header}
+      {body}
     </div>
   );
 }

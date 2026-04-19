@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
+import { Drawer as DrawerPrimitive } from 'vaul';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useGameStore } from '../game/store';
 import { PLAYER_NAMES, type RiskCard } from '../game/types';
 import { TERRITORY_MAP } from '../game/mapData';
-import { Swords, Shield, Move, ChevronRight, Dices, Target, ScrollText, ChevronDown, ChevronUp } from 'lucide-react';
+import { useIsMobile } from '../hooks/use-mobile';
+import { Swords, Shield, Move, ChevronRight, Dices, Target, ScrollText } from 'lucide-react';
 
 function isValidSet(cards: RiskCard[]): boolean {
   if (cards.length !== 3) return false;
@@ -168,7 +170,7 @@ export default function ActionPanel() {
   const [moveCount, setMoveCount] = useState(1);
   const [fortifyCount, setFortifyCount] = useState(1);
   const [selectedCardIds, setSelectedCardIds] = useState<string[]>([]);
-  const [mobileExpanded, setMobileExpanded] = useState(true);
+  const isMobile = useIsMobile();
 
   // Reset move-in slider to the required minimum whenever a new capture happens
   useEffect(() => { if (awaitingMoveIn) setMoveCount(minMoveIn); }, [awaitingMoveIn, minMoveIn]);
@@ -197,39 +199,33 @@ export default function ActionPanel() {
   })() : null;
   const maxMoveIn = captureSource ? captureSource.armies - 1 : 1;
 
-  return (
-    <div className="w-full md:w-80 bg-surface md:h-full flex flex-col shadow-elevated border-t md:border-t-0 md:border-l border-border">
-      {/* Header — acts as mobile toggle */}
-      <div
-        className="p-3 md:p-4 border-b border-border cursor-pointer md:cursor-default"
-        onClick={() => setMobileExpanded(v => !v)}
-      >
-        <div className="flex items-center gap-2">
-          <div className={`w-3 h-3 rounded-full bg-player-${currentPlayerIndex + 1}`} />
-          <span className="text-base font-semibold text-foreground flex-1">
-            {player?.isAI ? '🤖 ' : ''}{pName}
-          </span>
-          <span className="text-xs font-semibold text-primary">{phase}</span>
-          {phase === 'REINFORCE' && reinforcementsLeft > 0 && (
-            <span className="font-mono-tabular text-primary text-sm ml-1">+{reinforcementsLeft}</span>
-          )}
-          <span className="md:hidden ml-2 text-muted-foreground">
-            {mobileExpanded ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
-          </span>
-        </div>
-        <p className="text-xs text-muted-foreground mt-1 hidden md:block">
-          {phase === 'REINFORCE' && player?.cards.length >= 5
-            ? 'You must trade in cards before placing troops.'
-            : phase === 'REINFORCE'
-            ? `Place ${reinforcementsLeft} reinforcements on your territories.`
-            : phase === 'ATTACK'
-            ? 'Click an enemy territory to target it, then pick a source — or click your own territory first.'
-            : 'Move armies between two adjacent territories, or skip.'}
-        </p>
+  const header = (
+    <div className="p-3 md:p-4 border-b border-border shrink-0">
+      <div className="flex items-center gap-2">
+        <div className={`w-3 h-3 rounded-full bg-player-${currentPlayerIndex + 1}`} />
+        <span className="text-base font-semibold text-foreground flex-1">
+          {player?.isAI ? '🤖 ' : ''}{pName}
+        </span>
+        <span className="text-xs font-semibold text-primary">{phase}</span>
+        {phase === 'REINFORCE' && reinforcementsLeft > 0 && (
+          <span className="font-mono-tabular text-primary text-sm ml-1">+{reinforcementsLeft}</span>
+        )}
       </div>
+      <p className="text-xs text-muted-foreground mt-1">
+        {phase === 'REINFORCE' && player?.cards.length >= 5
+          ? 'Trade in cards before placing troops.'
+          : phase === 'REINFORCE'
+          ? `Place ${reinforcementsLeft} reinforcements on your territories.`
+          : phase === 'ATTACK'
+          ? 'Click target, then pick source — or click your territory first.'
+          : 'Move armies between connected territories, or skip.'}
+      </p>
+    </div>
+  );
 
-      {/* Collapsible body on mobile */}
-      <div className={`${mobileExpanded ? 'flex' : 'hidden'} md:flex flex-col flex-1 overflow-hidden max-h-[55vh] md:max-h-full`}>
+  const body = (
+    <div className="flex flex-col flex-1 overflow-hidden min-h-0">
+
 
       {/* Secret Mission */}
       {useMissions && missions[currentPlayerIndex] && !player?.isAI && (
@@ -399,7 +395,7 @@ export default function ActionPanel() {
       </div>
 
       {/* Game Log */}
-      <div className="border-t border-border p-3 max-h-32 md:max-h-48 overflow-y-auto">
+      <div className="border-t border-border p-3 max-h-32 md:max-h-48 overflow-y-auto shrink-0">
         <span className="text-xs text-muted-foreground font-semibold mb-2 block">COMMAND LOG</span>
         <div className="space-y-1">
           {log.slice(0, 20).map((entry, i) => (
@@ -407,8 +403,31 @@ export default function ActionPanel() {
           ))}
         </div>
       </div>
+    </div>
+  );
 
-      </div>{/* end collapsible body */}
+  if (isMobile) {
+    return (
+      <DrawerPrimitive.Root open onOpenChange={() => {}} modal={false} snapPoints={[0.14, 0.72]} defaultSnap={0.14} dismissible={false}>
+        <DrawerPrimitive.Portal>
+          <DrawerPrimitive.Content className="fixed inset-x-0 bottom-0 z-40 flex flex-col bg-surface rounded-t-2xl border-t border-border pb-safe" style={{ maxHeight: '72vh' }}>
+            <div className="flex justify-center py-2 shrink-0">
+              <div className="h-1.5 w-10 rounded-full bg-muted-foreground/30" />
+            </div>
+            {header}
+            <div className="flex-1 overflow-y-auto min-h-0">
+              {body}
+            </div>
+          </DrawerPrimitive.Content>
+        </DrawerPrimitive.Portal>
+      </DrawerPrimitive.Root>
+    );
+  }
+
+  return (
+    <div className="w-80 bg-surface h-full flex flex-col shadow-elevated border-l border-border">
+      {header}
+      {body}
     </div>
   );
 }
