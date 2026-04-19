@@ -189,13 +189,21 @@ function ContinentBonusTable() {
 }
 
 const PLAYER_HSL = [
-  'hsl(0, 84%, 60%)', 'hsl(217, 91%, 60%)', 'hsl(142, 71%, 45%)',
-  'hsl(48, 96%, 53%)', 'hsl(270, 67%, 60%)', 'hsl(24, 95%, 53%)',
+  'hsl(4, 85%, 58%)',   // Red
+  'hsl(47, 95%, 52%)',  // Yellow
+  'hsl(138, 60%, 44%)', // Green
+  'hsl(200, 85%, 58%)', // Light Blue
+  'hsl(0, 0%, 72%)',    // Black (gray for dark map visibility)
+  'hsl(330, 82%, 65%)', // Pink
 ];
 
 const PLAYER_HSL_DIM = [
-  'hsl(0, 50%, 25%)', 'hsl(217, 50%, 25%)', 'hsl(142, 40%, 20%)',
-  'hsl(48, 50%, 22%)', 'hsl(270, 40%, 22%)', 'hsl(24, 50%, 22%)',
+  'hsl(4, 55%, 22%)',   // Red dim
+  'hsl(47, 60%, 20%)',  // Yellow dim
+  'hsl(138, 45%, 18%)', // Green dim
+  'hsl(200, 55%, 22%)', // Light Blue dim
+  'hsl(0, 0%, 16%)',    // Black dim
+  'hsl(330, 55%, 22%)', // Pink dim
 ];
 
 export default function GameMap({ multiplayer = false }: { multiplayer?: boolean }) {

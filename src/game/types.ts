@@ -114,7 +114,7 @@ export const PLAYER_CSS_VARS = [
 ];
 
 export const PLAYER_NAMES = [
-  'Red Empire', 'Blue Legion', 'Green Alliance', 'Yellow Republic', 'Purple Dominion', 'Orange Federation'
+  'Red Empire', 'Yellow Republic', 'Green Alliance', 'Blue Legion', 'Black Order', 'Pink Phalanx'
 ];
 
 export const TRADE_IN_VALUES = [4, 6, 8, 10, 12, 15];
