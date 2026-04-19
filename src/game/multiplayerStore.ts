@@ -478,14 +478,16 @@ export const useMultiplayerStore = create<MultiplayerGameState>((set, get) => ({
       attackTarget: result.captured ? null : s.attackTarget,
     });
 
-    // Write to DB
-    await updateTerritory(s.gameId, s.attackSource, { army_count: result.newSourceArmies });
-    await updateTerritory(s.gameId, targetName, {
-      owner_slot_index: result.newTargetOwner,
-      army_count: result.captured ? 1 : result.newTargetArmies,
-    });
-    await updateGame(s.gameId, { has_conquered_this_turn: s.hasConqueredThisTurn || result.captured });
-    await addGameLog(s.gameId, s.currentPlayerIndex, logMsg, 'attack');
+    // Write to DB — all independent, fire in parallel
+    await Promise.all([
+      updateTerritory(s.gameId, s.attackSource, { army_count: result.newSourceArmies }),
+      updateTerritory(s.gameId, targetName, {
+        owner_slot_index: result.newTargetOwner,
+        army_count: result.captured ? 1 : result.newTargetArmies,
+      }),
+      updateGame(s.gameId, { has_conquered_this_turn: s.hasConqueredThisTurn || result.captured }),
+      addGameLog(s.gameId, s.currentPlayerIndex, logMsg, 'attack'),
+    ]);
 
     if (winnerId) {
       await updateGame(s.gameId, { status: 'COMPLETED', winner_id: winnerId });
@@ -517,9 +519,11 @@ export const useMultiplayerStore = create<MultiplayerGameState>((set, get) => ({
       awaitingMoveIn: false,
     });
 
-    // Write to DB
-    await updateTerritory(s.gameId, sourceId, { army_count: sourceState.armies - count });
-    await updateTerritory(s.gameId, captured, { army_count: count });
+    // Write to DB — parallel
+    await Promise.all([
+      updateTerritory(s.gameId, sourceId, { army_count: sourceState.armies - count }),
+      updateTerritory(s.gameId, captured, { army_count: count }),
+    ]);
   },
 
   // ==================== FORTIFY SELECTION ====================
@@ -561,10 +565,12 @@ export const useMultiplayerStore = create<MultiplayerGameState>((set, get) => ({
       },
     });
 
-    // Write to DB
-    await updateTerritory(s.gameId, fSource, { army_count: source.armies - count });
-    await updateTerritory(s.gameId, fTarget, { army_count: s.territories[fTarget].armies + count });
-    await addGameLog(s.gameId, s.currentPlayerIndex, `Fortified ${count} to ${fTarget}`, 'fortify');
+    // Write to DB — parallel
+    await Promise.all([
+      updateTerritory(s.gameId, fSource, { army_count: source.armies - count }),
+      updateTerritory(s.gameId, fTarget, { army_count: s.territories[fTarget].armies + count }),
+      addGameLog(s.gameId, s.currentPlayerIndex, `Fortified ${count} to ${fTarget}`, 'fortify'),
+    ]);
 
     // Reset selections so player can make another fortify move; endPhase is via the "End Turn" button
     set({ fortifySource: null, fortifyTarget: null });
@@ -624,12 +630,18 @@ export const useMultiplayerStore = create<MultiplayerGameState>((set, get) => ({
           }
         }
       }
-      await updateGame(s.gameId, { turn_phase: 'ATTACK' });
-      await addGameLog(s.gameId, s.currentPlayerIndex, 'Attack phase', 'info');
+      await Promise.all([
+        updateGame(s.gameId, { turn_phase: 'ATTACK' }),
+        addGameLog(s.gameId, s.currentPlayerIndex, 'Attack phase', 'info'),
+      ]);
       set({ phase: 'ATTACK', attackSource: null, attackTarget: null, lastDiceRoll: null });
     } else if (s.phase === 'ATTACK') {
       // Grant a card if a player conquered at least one territory this turn
       const currentPlayer = s.players.find(p => p.slotIndex === s.currentPlayerIndex);
+      const phaseWrites: Promise<void>[] = [
+        updateGame(s.gameId, { turn_phase: 'FORTIFY' }),
+        addGameLog(s.gameId, s.currentPlayerIndex, 'Fortify phase', 'info'),
+      ];
       if (s.hasConqueredThisTurn && currentPlayer) {
         const CARD_TYPES: RiskCard['type'][] = ['Infantry', 'Cavalry', 'Artillery'];
         const type = CARD_TYPES[Math.floor(Math.random() * CARD_TYPES.length)];
@@ -638,13 +650,14 @@ export const useMultiplayerStore = create<MultiplayerGameState>((set, get) => ({
           p.slotIndex === s.currentPlayerIndex ? { ...p, cards: [...p.cards, newCard] } : p
         );
         set({ players: updatedPlayers });
-        await updatePlayer(s.gameId, s.currentPlayerIndex, {
-          cards: updatedPlayers.find(p => p.slotIndex === s.currentPlayerIndex)!.cards,
-        });
-        await addGameLog(s.gameId, s.currentPlayerIndex, 'Earned a Risk card', 'info');
+        phaseWrites.push(
+          updatePlayer(s.gameId, s.currentPlayerIndex, {
+            cards: updatedPlayers.find(p => p.slotIndex === s.currentPlayerIndex)!.cards,
+          }),
+          addGameLog(s.gameId, s.currentPlayerIndex, 'Earned a Risk card', 'info'),
+        );
       }
-      await updateGame(s.gameId, { turn_phase: 'FORTIFY' });
-      await addGameLog(s.gameId, s.currentPlayerIndex, 'Fortify phase', 'info');
+      await Promise.all(phaseWrites);
       set({ phase: 'FORTIFY', fortifySource: null, fortifyTarget: null, attackSource: null, attackTarget: null });
     } else if (s.phase === 'FORTIFY') {
       // Advance to next player
@@ -655,15 +668,17 @@ export const useMultiplayerStore = create<MultiplayerGameState>((set, get) => ({
       const nextPlayer = s.players.find(p => p.slotIndex === next);
       const nextName = nextPlayer?.displayName || PLAYER_NAMES[next];
 
-      await updatePlayer(s.gameId, next, { armies_to_place: reinforcements });
-      await updateGame(s.gameId, {
-        current_player_index: next,
-        turn_phase: 'REINFORCE',
-        turn_number: s.turnNumber + 1,
-        has_conquered_this_turn: false,
-      });
-      await addGameLog(s.gameId, next,
-        `${nextPlayer?.isAi ? 'AI ' : ''}${nextName}'s turn — ${reinforcements} reinforcements`, 'turn_start');
+      await Promise.all([
+        updatePlayer(s.gameId, next, { armies_to_place: reinforcements }),
+        updateGame(s.gameId, {
+          current_player_index: next,
+          turn_phase: 'REINFORCE',
+          turn_number: s.turnNumber + 1,
+          has_conquered_this_turn: false,
+        }),
+        addGameLog(s.gameId, next,
+          `${nextPlayer?.isAi ? 'AI ' : ''}${nextName}'s turn — ${reinforcements} reinforcements`, 'turn_start'),
+      ]);
 
       set({
         currentPlayerIndex: next,
@@ -722,14 +737,28 @@ export const useMultiplayerStore = create<MultiplayerGameState>((set, get) => ({
         }
       }
 
-      // Reinforce (use fresh state — reinforcementsLeft may have grown from card trades)
-      const reinforceActions = aiReinforce(s.currentPlayerIndex, get().territories, get().reinforcementsLeft);
-      for (const action of reinforceActions) {
-        await get().placeReinforcement(action.territoryId);
-        await delay(50);
+      // Reinforce — batch all placements into one parallel DB round-trip
+      {
+        const reinforceActions = aiReinforce(s.currentPlayerIndex, get().territories, get().reinforcementsLeft);
+        if (reinforceActions.length > 0) {
+          const counts: Record<string, number> = {};
+          for (const a of reinforceActions) counts[a.territoryId] = (counts[a.territoryId] || 0) + 1;
+          const baseTerrs = get().territories;
+          const newTerritories = { ...baseTerrs };
+          for (const [tid, count] of Object.entries(counts)) {
+            newTerritories[tid] = { ...newTerritories[tid], armies: newTerritories[tid].armies + count };
+          }
+          set({ territories: newTerritories, reinforcementsLeft: 0 });
+          await Promise.all([
+            ...Object.entries(counts).map(([tid, count]) =>
+              updateTerritory(s.gameId!, tid, { army_count: baseTerrs[tid].armies + count })
+            ),
+            updatePlayer(s.gameId!, s.currentPlayerIndex, { armies_to_place: 0 }),
+          ]);
+        }
       }
 
-      // End reinforce → attack (placeReinforcement auto-advances on last placement, avoid double-advance)
+      // End reinforce → attack
       if (get().phase === 'REINFORCE') {
         await get().endPhase();
       }
