@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { GameState, Phase, Player, TerritoryState, RiskCard, CardType, Mission, PLAYER_NAMES, PLAYER_COLORS, getTradeInValue } from './types';
-import { TERRITORIES, CONTINENTS } from './mapData';
+import { TERRITORIES, CONTINENTS, TERRITORY_MAP } from './mapData';
 import { aiReinforce, aiDecideAttacks, aiFortify } from './ai';
 import { assignMissions, checkMissionComplete } from './missions';
 
@@ -374,10 +374,24 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   selectFortifyTarget: (territoryId: string) => {
     const s = get();
-    if (!s.fortifySource) return;
-    const source = TERRITORIES.find(t => t.id === s.fortifySource)!;
-    if (!source.adjacent.includes(territoryId)) return;
+    if (!s.fortifySource || territoryId === s.fortifySource) return;
     if (s.territories[territoryId]?.ownerId !== s.currentPlayerIndex) return;
+    // BFS: target must be reachable through connected owned territories
+    const reachable = new Set<string>();
+    const queue = [s.fortifySource];
+    reachable.add(s.fortifySource);
+    while (queue.length > 0) {
+      const cur = queue.shift()!;
+      const t = TERRITORY_MAP.get(cur);
+      if (!t) continue;
+      for (const adjId of t.adjacent) {
+        if (!reachable.has(adjId) && s.territories[adjId]?.ownerId === s.currentPlayerIndex) {
+          reachable.add(adjId);
+          queue.push(adjId);
+        }
+      }
+    }
+    if (!reachable.has(territoryId)) return;
     set({ fortifyTarget: territoryId });
   },
 

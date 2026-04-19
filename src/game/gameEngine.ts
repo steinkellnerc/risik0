@@ -156,6 +156,29 @@ export function areAdjacent(tid1: string, tid2: string): boolean {
   return t ? t.adjacent.includes(tid2) : false;
 }
 
+// BFS: all territories reachable from source through a connected chain of territories owned by ownerId
+export function getReachableTerritories(
+  sourceId: string,
+  territories: Record<string, { ownerId: number }>,
+  ownerId: number
+): Set<string> {
+  const reachable = new Set<string>();
+  const queue = [sourceId];
+  reachable.add(sourceId);
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+    const t = TERRITORY_MAP.get(current);
+    if (!t) continue;
+    for (const adjId of t.adjacent) {
+      if (!reachable.has(adjId) && territories[adjId]?.ownerId === ownerId) {
+        reachable.add(adjId);
+        queue.push(adjId);
+      }
+    }
+  }
+  return reachable;
+}
+
 // ==================== NEXT PLAYER ====================
 
 export function getNextActivePlayer(

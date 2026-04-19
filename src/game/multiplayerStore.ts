@@ -15,6 +15,7 @@ import {
   getNextActivePlayer,
   checkWorldDomination,
   isPlayerEliminated,
+  getReachableTerritories,
 } from './gameEngine';
 import { checkMissionComplete, assignMissions, assignMissionsSeeded } from './missions';
 import { aiReinforce, aiDecideAttacks, aiFortify } from './ai';
@@ -535,9 +536,10 @@ export const useMultiplayerStore = create<MultiplayerGameState>((set, get) => ({
 
   selectFortifyTarget: (territoryId: string) => {
     const s = get();
-    if (!s.fortifySource) return;
-    if (!areAdjacent(s.fortifySource, territoryId)) return;
+    if (!s.fortifySource || territoryId === s.fortifySource) return;
     if (s.territories[territoryId]?.ownerId !== s.currentPlayerIndex) return;
+    const reachable = getReachableTerritories(s.fortifySource, s.territories, s.currentPlayerIndex);
+    if (!reachable.has(territoryId)) return;
     set({ fortifyTarget: territoryId });
   },
 
