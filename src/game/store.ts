@@ -80,6 +80,7 @@ export interface GameStore extends GameState {
   runAITurn: () => void;
   deck: RiskCard[];
   capturedTerritory: string | null;
+  captureSource: string | null;
   awaitingMoveIn: boolean;
   minMoveIn: number;
 }
@@ -104,6 +105,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   started: false,
   deck: [],
   capturedTerritory: null,
+  captureSource: null,
   awaitingMoveIn: false,
   minMoveIn: 1,
   missions: {},
@@ -162,6 +164,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       started: true,
       deck: createDeck(),
       capturedTerritory: null,
+      captureSource: null,
       awaitingMoveIn: false,
       minMoveIn: 1,
       missions,
@@ -332,6 +335,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       players: newPlayers,
       winner,
       capturedTerritory: captured ? targetName : null,
+      captureSource: captured ? s.attackSource : null,
       awaitingMoveIn: captured,
       minMoveIn: captured ? attackDice : 1,
       attackSource: captured ? null : s.attackSource,
@@ -341,25 +345,20 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   moveArmiesAfterCapture: (count: number) => {
     const s = get();
-    if (!s.capturedTerritory || !s.awaitingMoveIn) return;
-    const lastSource = Object.entries(s.territories)
-      .filter(([id, t]) => t.ownerId === s.currentPlayerIndex && t.armies > 1 &&
-        TERRITORIES.find(tt => tt.id === id)?.adjacent.includes(s.capturedTerritory!))
-      .sort(([, a], [, b]) => b.armies - a.armies)[0];
-
-    if (!lastSource) return;
-    const [sourceId, sourceState] = lastSource;
+    if (!s.capturedTerritory || !s.awaitingMoveIn || !s.captureSource) return;
+    const sourceState = s.territories[s.captureSource];
+    if (!sourceState) return;
     const maxMove = sourceState.armies - 1;
-    // Must move at least as many armies as attack dice used (capped at maxMove if source ran low)
     count = Math.max(Math.min(s.minMoveIn, maxMove), Math.min(count, maxMove));
 
     set({
       territories: {
         ...s.territories,
-        [sourceId]: { ...sourceState, armies: sourceState.armies - count },
+        [s.captureSource]: { ...sourceState, armies: sourceState.armies - count },
         [s.capturedTerritory]: { ...s.territories[s.capturedTerritory], armies: count },
       },
       capturedTerritory: null,
+      captureSource: null,
       awaitingMoveIn: false,
     });
   },
@@ -532,17 +531,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
       attacksThisTurn++;
 
       // Handle move-in after capture
-      if (get().awaitingMoveIn) {
-        const capturedTerr = get().capturedTerritory;
-        if (capturedTerr) {
-          const srcState = Object.entries(get().territories)
-            .find(([id, t]) => t.ownerId === s.currentPlayerIndex && t.armies > 1 &&
-              TERRITORIES.find(tt => tt.id === id)?.adjacent.includes(capturedTerr));
-          if (srcState) {
-            const moveCount = Math.max(1, Math.floor((srcState[1].armies - 1) / 2));
-            get().moveArmiesAfterCapture(moveCount);
-          }
-        }
+      if (get().awaitingMoveIn && get().captureSource) {
+        const srcArmies = get().territories[get().captureSource!]?.armies ?? 2;
+        const moveCount = Math.max(1, Math.floor((srcArmies - 1) / 2));
+        get().moveArmiesAfterCapture(moveCount);
       }
 
       if (get().winner !== null) return;

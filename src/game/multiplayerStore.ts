@@ -77,6 +77,7 @@ export interface MultiplayerGameState {
   fortifyTarget: string | null;
   lastDiceRoll: { attacker: number[]; defender: number[] } | null;
   capturedTerritory: string | null;
+  captureSource: string | null;
   awaitingMoveIn: boolean;
   minMoveIn: number;
   reinforcementsLeft: number;
@@ -132,6 +133,7 @@ export const useMultiplayerStore = create<MultiplayerGameState>((set, get) => ({
   fortifyTarget: null,
   lastDiceRoll: null,
   capturedTerritory: null,
+  captureSource: null,
   awaitingMoveIn: false,
   minMoveIn: 1,
   reinforcementsLeft: 0,
@@ -224,6 +226,7 @@ export const useMultiplayerStore = create<MultiplayerGameState>((set, get) => ({
       fortifyTarget: null,
       lastDiceRoll: null,
       capturedTerritory: null,
+      captureSource: null,
       awaitingMoveIn: false,
     });
 
@@ -256,6 +259,7 @@ export const useMultiplayerStore = create<MultiplayerGameState>((set, get) => ({
             fortifyTarget: null,
             lastDiceRoll: null,
             capturedTerritory: null,
+            captureSource: null,
             awaitingMoveIn: false,
           } : {}),
         });
@@ -467,6 +471,7 @@ export const useMultiplayerStore = create<MultiplayerGameState>((set, get) => ({
       lastDiceRoll: { attacker: result.attackerRolls, defender: result.defenderRolls },
       hasConqueredThisTurn: s.hasConqueredThisTurn || result.captured,
       capturedTerritory: result.captured ? targetName : null,
+      captureSource: result.captured ? s.attackSource : null,
       awaitingMoveIn: result.captured,
       minMoveIn: result.captured ? attackDice : 1,
       attackSource: result.captured ? null : s.attackSource,
@@ -490,26 +495,14 @@ export const useMultiplayerStore = create<MultiplayerGameState>((set, get) => ({
   // ==================== MOVE IN AFTER CAPTURE ====================
   moveArmiesAfterCapture: async (count: number) => {
     const s = get();
-    if (!s.gameId || !s.capturedTerritory || !s.awaitingMoveIn) return;
+    if (!s.gameId || !s.capturedTerritory || !s.awaitingMoveIn || !s.captureSource) return;
 
     const captured = s.capturedTerritory;
-    const t = TERRITORY_MAP.get(captured);
-    if (!t) return;
-
-    // Find adjacent owned territory with armies to spare (prefer most armies)
-    const sourceId = t.adjacent
-      .filter(a => s.territories[a]?.ownerId === s.currentPlayerIndex && s.territories[a]?.armies > 1)
-      .sort((a, b) => s.territories[b].armies - s.territories[a].armies)[0];
-    if (!sourceId) {
-      // No source available — set 1 army on captured territory as minimum
-      set({ territories: { ...s.territories, [captured]: { ...s.territories[captured], armies: 1 } }, capturedTerritory: null, awaitingMoveIn: false });
-      await updateTerritory(s.gameId, captured, { army_count: 1 });
-      return;
-    }
-
+    const sourceId = s.captureSource;
     const sourceState = s.territories[sourceId];
+    if (!sourceState) return;
+
     const maxMove = sourceState.armies - 1;
-    // Must move at least as many armies as attack dice used (capped at maxMove if source ran low)
     count = Math.max(Math.min(s.minMoveIn, maxMove), Math.min(count, maxMove));
 
     // Optimistic update
@@ -520,6 +513,7 @@ export const useMultiplayerStore = create<MultiplayerGameState>((set, get) => ({
         [captured]: { ...s.territories[captured], armies: count },
       },
       capturedTerritory: null,
+      captureSource: null,
       awaitingMoveIn: false,
     });
 
@@ -767,19 +761,10 @@ export const useMultiplayerStore = create<MultiplayerGameState>((set, get) => ({
             await delay(100);
             madeAttack = true;
 
-            if (get().awaitingMoveIn && get().capturedTerritory) {
-              const capturedTerr = get().capturedTerritory!;
-              const t = TERRITORY_MAP.get(capturedTerr);
-              if (t) {
-                const srcEntry = t.adjacent.find(a => {
-                  const ts = get().territories[a];
-                  return ts && ts.ownerId === s.currentPlayerIndex && ts.armies > 1;
-                });
-                const moveCount = srcEntry
-                  ? Math.max(1, Math.floor((get().territories[srcEntry].armies - 1) / 2))
-                  : 1;
-                await get().moveArmiesAfterCapture(moveCount);
-              }
+            if (get().awaitingMoveIn && get().captureSource) {
+              const srcArmies = get().territories[get().captureSource!]?.armies ?? 2;
+              const moveCount = Math.max(1, Math.floor((srcArmies - 1) / 2));
+              await get().moveArmiesAfterCapture(moveCount);
               await delay(50);
               break; // recalculate after each capture
             }

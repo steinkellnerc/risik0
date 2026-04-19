@@ -163,7 +163,7 @@ export default function ActionPanel() {
   const {
     phase, currentPlayerIndex, reinforcementsLeft, attackSource, attackTarget,
     fortifySource, fortifyTarget, lastDiceRoll, territories, players, awaitingMoveIn,
-    capturedTerritory, minMoveIn, endPhase, executeAttack, executeFortify, moveArmiesAfterCapture,
+    capturedTerritory, captureSource: captureSourceId, minMoveIn, endPhase, executeAttack, executeFortify, moveArmiesAfterCapture,
     tradeInCards, log, missions, useMissions,
   } = useGameStore();
 
@@ -188,16 +188,9 @@ export default function ActionPanel() {
   const fortifySourceState = fortifySource ? territories[fortifySource] : null;
   const maxFortify = fortifySourceState ? fortifySourceState.armies - 1 : 0;
 
-  // Move-in after capture
-  const captureSource = capturedTerritory ? (() => {
-    const t = TERRITORY_MAP.get(capturedTerritory);
-    if (!t) return null;
-    const adj = t.adjacent
-      .filter(a => territories[a]?.ownerId === currentPlayerIndex && territories[a]?.armies > 1)
-      .sort((a, b) => territories[b].armies - territories[a].armies)[0];
-    return adj ? territories[adj] : null;
-  })() : null;
-  const maxMoveIn = captureSource ? captureSource.armies - 1 : 1;
+  // Move-in after capture — armies come only from the attacking territory
+  const captureSourceState = captureSourceId ? territories[captureSourceId] : null;
+  const maxMoveIn = captureSourceState ? captureSourceState.armies - 1 : 1;
 
   const header = (
     <div className="p-3 md:p-4 border-b border-border shrink-0">
