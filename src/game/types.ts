@@ -71,11 +71,11 @@ export const MISSIONS_POOL: Omit<Mission, 'targetPlayerIndex'>[] = [
 // 6 destroy-player missions (one per player color)
 export const DESTROY_PLAYER_MISSIONS: Omit<Mission, 'targetPlayerIndex'>[] = [
   { id: 'destroy-0', type: 'destroy_player', description: 'Destroy all armies of Red Empire.' },
-  { id: 'destroy-1', type: 'destroy_player', description: 'Destroy all armies of Blue Legion.' },
+  { id: 'destroy-1', type: 'destroy_player', description: 'Destroy all armies of Yellow Republic.' },
   { id: 'destroy-2', type: 'destroy_player', description: 'Destroy all armies of Green Alliance.' },
-  { id: 'destroy-3', type: 'destroy_player', description: 'Destroy all armies of Yellow Republic.' },
-  { id: 'destroy-4', type: 'destroy_player', description: 'Destroy all armies of Purple Dominion.' },
-  { id: 'destroy-5', type: 'destroy_player', description: 'Destroy all armies of Orange Federation.' },
+  { id: 'destroy-3', type: 'destroy_player', description: 'Destroy all armies of Blue Legion.' },
+  { id: 'destroy-4', type: 'destroy_player', description: 'Destroy all armies of Black Order.' },
+  { id: 'destroy-5', type: 'destroy_player', description: 'Destroy all armies of Pink Phalanx.' },
 ];
 
 export interface GameConfig {
