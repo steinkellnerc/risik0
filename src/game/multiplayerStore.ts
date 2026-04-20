@@ -99,6 +99,7 @@ export interface MultiplayerGameState {
   tradeInCards: (cardIds: string[]) => Promise<void>;
   endPhase: () => Promise<void>;
   runAITurn: () => Promise<void>;
+  kickAI: () => void;
 }
 
 let realtimeChannel: RealtimeChannel | null = null;
@@ -824,6 +825,11 @@ export const useMultiplayerStore = create<MultiplayerGameState>((set, get) => ({
     } finally {
       aiTurnRunning = false;
     }
+  },
+
+  kickAI: () => {
+    aiTurnRunning = false;
+    setTimeout(() => get().runAITurn(), 100);
   },
 }));
 

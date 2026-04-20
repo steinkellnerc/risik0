@@ -164,7 +164,7 @@ export default function MultiplayerActionPanel() {
     phase, currentPlayerIndex, reinforcementsLeft, attackSource, attackTarget,
     fortifySource, fortifyTarget, lastDiceRoll, territories, players, awaitingMoveIn,
     capturedTerritory, captureSource: captureSourceId, minMoveIn, endPhase, executeAttack, executeFortify, moveArmiesAfterCapture,
-    tradeInCards, log, isMyTurn, mySlotIndex,
+    tradeInCards, log, isMyTurn, mySlotIndex, myUserId, hostUserId, kickAI,
   } = useMultiplayerStore();
 
   const [moveCount, setMoveCount] = useState(1);
@@ -253,9 +253,17 @@ export default function MultiplayerActionPanel() {
       {/* Phase actions */}
       <div className="flex-1 p-3 space-y-3 overflow-y-auto">
         {!isMyTurn && (
-          <div className="flex flex-col items-center justify-center py-4 text-muted-foreground">
+          <div className="flex flex-col items-center justify-center py-4 text-muted-foreground gap-2">
             <Clock size={20} className="mb-1.5 opacity-50" />
             <span className="text-xs">Waiting for {currentPlayer?.isAi ? 'AI' : currentPlayer?.displayName}...</span>
+            {currentPlayer?.isAi && myUserId === hostUserId && (
+              <button
+                onClick={kickAI}
+                className="mt-1 text-xs px-3 py-1.5 rounded bg-muted hover:bg-muted/70 border border-border text-foreground"
+              >
+                Nudge AI
+              </button>
+            )}
           </div>
         )}
 
