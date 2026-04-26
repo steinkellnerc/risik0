@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Drawer as DrawerPrimitive } from 'vaul';
-import { AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useMultiplayerStore } from '../game/multiplayerStore';
 import { TERRITORY_MAP } from '../game/mapData';
 import type { RiskCard } from '../game/types';
