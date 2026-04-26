@@ -661,6 +661,23 @@ export const useMultiplayerStore = create<MultiplayerGameState>((set, get) => ({
       await Promise.all(phaseWrites);
       set({ phase: 'FORTIFY', fortifySource: null, fortifyTarget: null, attackSource: null, attackTarget: null });
     } else if (s.phase === 'FORTIFY') {
+      // Check mission completion after fortify (e.g. 18 territories with 2 armies each)
+      if (s.useMissions && s.gameId) {
+        const missionMap = assignMissionsSeeded(s.gameId, s.players.length);
+        const mission = missionMap[s.currentPlayerIndex];
+        const eliminated = Array(6).fill(false) as boolean[];
+        for (const p of s.players) eliminated[p.slotIndex] = p.eliminated;
+        if (mission && checkMissionComplete(s.currentPlayerIndex, mission, s.territories, eliminated)) {
+          const winnerPlayer = s.players.find(p => p.slotIndex === s.currentPlayerIndex);
+          const wId = winnerPlayer ? (winnerPlayer.userId ?? winnerPlayer.id) : null;
+          if (wId) {
+            set({ winnerId: wId });
+            await updateGame(s.gameId, { winner_id: wId, status: 'finished' });
+            await addGameLog(s.gameId, s.currentPlayerIndex, `${winnerPlayer?.displayName} wins by completing their mission!`, 'win');
+            return;
+          }
+        }
+      }
       // Advance to next player
       const eliminated = s.players.map(p => p.eliminated);
       const next = getNextActivePlayer(s.currentPlayerIndex, eliminated);
