@@ -92,15 +92,20 @@ export default function LoginPage() {
               className="w-full px-3 py-2 rounded-lg bg-muted text-foreground text-sm placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-2 focus:ring-primary"
               required
             />
-            <input
-              type="password"
-              placeholder="Password"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              className="w-full px-3 py-2 rounded-lg bg-muted text-foreground text-sm placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-2 focus:ring-primary"
-              required
-              minLength={6}
-            />
+            <div>
+              <input
+                type="password"
+                placeholder="Password"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg bg-muted text-foreground text-sm placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-2 focus:ring-primary"
+                required
+                minLength={6}
+              />
+              {mode === 'register' && (
+                <p className="mt-1 text-xs text-muted-foreground px-1">At least 6 characters</p>
+              )}
+            </div>
             <button
               type="submit"
               disabled={loading}

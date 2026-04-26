@@ -393,33 +393,28 @@ export async function listOpenGames(currentUserId?: string): Promise<Array<{
     if (!allGames.find(x => x.id === g.id)) allGames.push(g);
   }
 
-  const games = allGames;
+  if (!allGames.length) return [];
 
-  if (!games) return [];
+  const gameIds = allGames.map(g => g.id);
 
-  const results = [];
-  for (const game of games) {
-    const [countResult, hostResult] = await Promise.all([
-      supabase
-        .from('players')
-        .select('*', { count: 'exact', head: true })
-        .eq('game_id', game.id)
-        .eq('is_ai', false),
-      supabase
-        .from('players')
-        .select('user_id')
-        .eq('game_id', game.id)
-        .eq('slot_index', 0)
-        .single(),
-    ]);
-    results.push({
-      ...game,
-      playerCount: countResult.count ?? 0,
-      hostUserId: (game.host_user_id as string | null) ?? (hostResult.data?.user_id as string | null) ?? null,
-      useMissions: (game.use_missions as boolean) ?? false,
-    });
+  // Single query for all human player rows across all games
+  const { data: playerRows } = await supabase
+    .from('players')
+    .select('game_id')
+    .in('game_id', gameIds)
+    .eq('is_ai', false);
+
+  const countByGame = new Map<string, number>();
+  for (const row of (playerRows ?? [])) {
+    countByGame.set(row.game_id, (countByGame.get(row.game_id) ?? 0) + 1);
   }
-  return results;
+
+  return allGames.map(game => ({
+    ...game,
+    playerCount: countByGame.get(game.id) ?? 0,
+    hostUserId: (game.host_user_id as string | null) ?? null,
+    useMissions: (game.use_missions as boolean) ?? false,
+  }));
 }
 
 // ==================== GRANT CARD ====================
@@ -489,32 +484,32 @@ export async function listMyActiveGames(userId: string): Promise<Array<{
 
   if (!games?.length) return [];
 
-  const results = [];
-  for (const g of games) {
-    const { count } = await supabase
-      .from('players')
-      .select('*', { count: 'exact', head: true })
-      .eq('game_id', g.id)
-      .eq('is_ai', false);
-    results.push({
-      id: g.id as string,
-      playerCount: count ?? 0,
-      useMissions: (g.use_missions as boolean) ?? false,
-      turnNumber: (g.turn_number as number) ?? 1,
-      hostUserId: (g.host_user_id as string | null) ?? null,
-    });
+  const { data: allPlayerRows } = await supabase
+    .from('players')
+    .select('game_id')
+    .in('game_id', games.map(g => g.id))
+    .eq('is_ai', false);
+
+  const countByGame = new Map<string, number>();
+  for (const row of (allPlayerRows ?? [])) {
+    countByGame.set(row.game_id, (countByGame.get(row.game_id) ?? 0) + 1);
   }
-  return results;
+
+  return games.map(g => ({
+    id: g.id as string,
+    playerCount: countByGame.get(g.id) ?? 0,
+    useMissions: (g.use_missions as boolean) ?? false,
+    turnNumber: (g.turn_number as number) ?? 1,
+    hostUserId: (g.host_user_id as string | null) ?? null,
+  }));
 }
 
 // ==================== CANCEL GAME ====================
 
 export async function cancelGame(gameId: string): Promise<void> {
-  const { error, data } = await supabase
+  const { error } = await supabase
     .from('games')
     .update({ status: 'CANCELLED' })
-    .eq('id', gameId)
-    .select();
-  console.log('[cancelGame]', { gameId, data, error });
+    .eq('id', gameId);
   if (error) throw new Error(error.message);
 }
