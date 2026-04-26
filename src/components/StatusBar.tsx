@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useGameStore } from '../game/store';
 import { PLAYER_NAMES } from '../game/types';
@@ -21,17 +22,27 @@ export default function StatusBar() {
   if (winner !== null) {
     const winnerMission = useMissions ? missions[winner] : null;
     return (
-      <div className="bg-surface shadow-elevated px-4 py-5 flex flex-col items-center gap-4">
-        <span className="text-2xl font-bold text-foreground">
-          🏆 {PLAYER_NAMES[winner]} wins the game!
-        </span>
-        {winnerMission && (
-          <p className="text-sm text-primary font-medium text-center">
-            Mission: {winnerMission.description}
-          </p>
-        )}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-6 bg-background/95 backdrop-blur-sm px-4 overflow-y-auto py-8"
+      >
+        <motion.div
+          initial={{ scale: 0.7, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ delay: 0.1, type: 'spring', stiffness: 260, damping: 18 }}
+          className="text-7xl"
+        >
+          🏆
+        </motion.div>
+        <div className="text-center space-y-2">
+          <h1 className="text-3xl font-bold text-foreground">{PLAYER_NAMES[winner]} wins!</h1>
+          {winnerMission && (
+            <p className="text-sm text-primary font-medium">Mission: {winnerMission.description}</p>
+          )}
+        </div>
         {useMissions && (
-          <div className="w-full max-w-lg bg-muted rounded-lg p-3 space-y-1.5">
+          <div className="w-full max-w-sm bg-surface rounded-xl p-4 space-y-2 shadow-elevated">
             <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">All missions revealed</span>
             {players.map((p, i) => (
               <div key={i} className="flex items-start gap-2 text-xs">
@@ -39,28 +50,28 @@ export default function StatusBar() {
                 <span className={`font-semibold shrink-0 ${i === winner ? 'text-primary' : 'text-muted-foreground'}`}>
                   {p.isAI ? '🤖 ' : ''}{p.name}:
                 </span>
-                <span className={i === winner ? 'text-primary' : 'text-foreground'}>
+                <span className={i === winner ? 'text-primary' : 'text-foreground/80'}>
                   {missions[i]?.description ?? '—'}
                 </span>
               </div>
             ))}
           </div>
         )}
-        <div className="flex gap-2">
+        <div className="flex gap-3">
           <button
             onClick={() => navigate('/')}
-            className="px-3 py-1.5 text-xs font-semibold bg-secondary text-foreground rounded-lg hover:bg-primary hover:text-primary-foreground transition-colors"
+            className="px-4 py-2 text-sm font-semibold bg-secondary text-foreground rounded-xl hover:bg-secondary/80 transition-colors"
           >
             Return to Lobby
           </button>
           <button
             onClick={() => initGame(players.filter(p => !p.isAI).length, useMissions)}
-            className="px-3 py-1.5 text-xs font-semibold bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity"
+            className="px-4 py-2 text-sm font-semibold bg-primary text-primary-foreground rounded-xl hover:opacity-90 transition-opacity shadow-glow"
           >
             Play Again
           </button>
         </div>
-      </div>
+      </motion.div>
     );
   }
 

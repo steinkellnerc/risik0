@@ -202,7 +202,7 @@ export default function MultiplayerActionPanel() {
         <span className="text-sm font-semibold text-foreground flex-1">
           {currentPlayer?.isAi ? 'AI ' : ''}{currentPlayer?.displayName}
         </span>
-        <span className="text-xs font-semibold text-primary">{phase}</span>
+        <span className={`text-xs font-semibold ${phase === 'ATTACK' ? 'text-destructive' : phase === 'FORTIFY' ? 'text-green-400' : 'text-primary'}`}>{phase}</span>
         {isMyTurn && phase === 'REINFORCE' && reinforcementsLeft > 0 && (
           <span className="font-mono-tabular text-primary text-sm ml-1">+{reinforcementsLeft}</span>
         )}
@@ -331,13 +331,17 @@ export default function MultiplayerActionPanel() {
 
                 {attackSource && attackTarget && (
                   <div className="space-y-2">
-                    {[...Array(maxAttackDice)].map((_, i) => (
-                      <button key={i} onClick={() => executeAttack(i + 1, maxDefendDice)}
-                        className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-destructive text-destructive-foreground rounded-md text-xs font-medium hover:opacity-90 transition-opacity">
-                        <Dices size={14} />
-                        Attack with {i + 1} {i === 0 ? 'die' : 'dice'}
-                      </button>
-                    ))}
+                    {[...Array(maxAttackDice)].map((_, i) => {
+                      const diceCount = maxAttackDice - i;
+                      const isMax = i === 0;
+                      return (
+                        <button key={diceCount} type="button" onClick={() => executeAttack(diceCount, maxDefendDice)}
+                          className={`w-full flex items-center justify-center gap-2 px-3 py-2 rounded-md text-xs font-medium hover:opacity-90 transition-opacity ${isMax ? 'bg-destructive text-destructive-foreground' : 'border border-destructive/40 text-destructive hover:bg-destructive/10'}`}>
+                          <Dices size={14} />
+                          Attack with {diceCount} {diceCount === 1 ? 'die' : 'dice'}
+                        </button>
+                      );
+                    })}
                   </div>
                 )}
 

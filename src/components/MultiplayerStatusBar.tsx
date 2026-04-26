@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useMultiplayerStore } from '../game/multiplayerStore';
 import { Clock, Home, Sword, Square, Target } from 'lucide-react';
@@ -34,17 +35,27 @@ export default function MultiplayerStatusBar() {
   if (winnerId) {
     const winner = players.find(p => p.userId === winnerId || p.id === winnerId);
     return (
-      <div className="bg-surface shadow-elevated px-4 py-5 flex flex-col items-center gap-4">
-        <span className="text-2xl font-bold text-foreground">
-          🏆 {winner?.displayName || 'Unknown'} wins the game!
-        </span>
-        {useMissions && winner?.secretObjective && (
-          <p className="text-sm text-primary font-medium text-center">
-            Mission: {winner.secretObjective}
-          </p>
-        )}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-6 bg-background/95 backdrop-blur-sm px-4 overflow-y-auto py-8"
+      >
+        <motion.div
+          initial={{ scale: 0.7, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ delay: 0.1, type: 'spring', stiffness: 260, damping: 18 }}
+          className="text-7xl"
+        >
+          🏆
+        </motion.div>
+        <div className="text-center space-y-2">
+          <h1 className="text-3xl font-bold text-foreground">{winner?.displayName || 'Unknown'} wins!</h1>
+          {useMissions && winner?.secretObjective && (
+            <p className="text-sm text-primary font-medium">Mission: {winner.secretObjective}</p>
+          )}
+        </div>
         {useMissions && (
-          <div className="w-full max-w-lg bg-muted rounded-lg p-3 space-y-1.5">
+          <div className="w-full max-w-sm bg-surface rounded-xl p-4 space-y-2 shadow-elevated">
             <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">All missions revealed</span>
             {players.map(p => (
               <div key={p.slotIndex} className="flex items-start gap-2 text-xs">
@@ -52,7 +63,7 @@ export default function MultiplayerStatusBar() {
                 <span className={`font-semibold shrink-0 ${p.userId === winnerId ? 'text-primary' : 'text-muted-foreground'}`}>
                   {p.isAi ? 'AI ' : ''}{p.displayName}:
                 </span>
-                <span className={p.userId === winnerId ? 'text-primary' : 'text-foreground'}>
+                <span className={p.userId === winnerId ? 'text-primary' : 'text-foreground/80'}>
                   {p.secretObjective ?? '—'}
                 </span>
               </div>
@@ -60,12 +71,13 @@ export default function MultiplayerStatusBar() {
           </div>
         )}
         <button
+          type="button"
           onClick={handleLeave}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground bg-secondary rounded-lg transition-colors"
+          className="flex items-center gap-1.5 px-5 py-2.5 text-sm font-semibold bg-primary text-primary-foreground rounded-xl hover:opacity-90 transition-opacity shadow-glow"
         >
-          <Home size={13} /> Back to Lobby
+          <Home size={14} /> Back to Lobby
         </button>
-      </div>
+      </motion.div>
     );
   }
 
@@ -78,15 +90,16 @@ export default function MultiplayerStatusBar() {
       {confirmLeave ? (
         <div className="flex items-center gap-2 shrink-0">
           <span className="text-xs text-muted-foreground">Leave game?</span>
-          <button onClick={handleLeave} className="px-2 py-1 text-xs bg-destructive text-destructive-foreground rounded-md hover:opacity-90">
+          <button type="button" onClick={handleLeave} className="px-2 py-1 text-xs bg-destructive text-destructive-foreground rounded-md hover:opacity-90">
             Leave
           </button>
-          <button onClick={() => setConfirmLeave(false)} className="px-2 py-1 text-xs bg-secondary text-muted-foreground rounded-md hover:text-foreground">
+          <button type="button" onClick={() => setConfirmLeave(false)} className="px-2 py-1 text-xs bg-secondary text-muted-foreground rounded-md hover:text-foreground">
             Stay
           </button>
         </div>
       ) : (
         <button
+          type="button"
           onClick={() => setConfirmLeave(true)}
           className="flex items-center gap-1 px-2 py-1 text-xs text-muted-foreground hover:text-foreground bg-secondary rounded-md transition-colors shrink-0"
           title="Back to Lobby"
@@ -116,8 +129,8 @@ export default function MultiplayerStatusBar() {
         </div>
       )}
       {isMyTurn && (
-        <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-primary/20 shrink-0">
-          <span className="text-xs text-primary font-semibold">YOUR TURN</span>
+        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-primary text-primary-foreground shadow-glow shrink-0">
+          <span className="text-xs font-bold tracking-wide">YOUR TURN</span>
         </div>
       )}
 

@@ -220,7 +220,10 @@ export default function LobbyPage() {
               </button>
             </div>
             {otherGames.length === 0 ? (
-              <p className="text-xs text-muted-foreground text-center py-3">No open games from other players.</p>
+              <div className="flex flex-col items-center gap-2 py-5 text-muted-foreground">
+                <Users size={22} className="opacity-30" />
+                <p className="text-xs text-center">No open games right now — create one above!</p>
+              </div>
             ) : (
               otherGames.map(game => (
                 <div key={game.id} className="flex items-center justify-between px-3 py-2.5 rounded-lg bg-muted/50">
@@ -228,7 +231,7 @@ export default function LobbyPage() {
                     <span className="text-xs text-foreground font-medium">{game.playerCount} waiting</span>
                     <ModeTag useMissions={game.useMissions} />
                   </div>
-                  <button onClick={() => handleJoinGame(game.id)} className="px-3 py-1.5 bg-secondary text-foreground rounded-md text-xs font-semibold hover:bg-secondary/80 transition-colors">
+                  <button type="button" onClick={() => handleJoinGame(game.id)} className="px-3 py-1.5 bg-secondary text-foreground rounded-md text-xs font-semibold hover:bg-secondary/80 transition-colors">
                     Join
                   </button>
                 </div>
@@ -237,7 +240,7 @@ export default function LobbyPage() {
           </div>
 
           {/* Local game */}
-          <button onClick={() => navigate('/local')} className="w-full flex items-center justify-center gap-2 px-4 py-2.5 border border-border text-muted-foreground rounded-xl text-sm hover:bg-secondary transition-colors">
+          <button type="button" onClick={() => navigate('/local')} className="w-full flex items-center justify-center gap-2 px-4 py-2.5 border border-border text-muted-foreground rounded-xl text-sm hover:bg-secondary transition-colors">
             <Gamepad2 size={16} /> Play Local (Single Device)
           </button>
 

@@ -138,28 +138,31 @@ export default function MultiplayerGamePage() {
   // Connecting screen
   if (!connected || mySlotIndex === null) {
     return (
-      <div className="h-screen-safe bg-background flex flex-col items-center justify-center gap-4 px-4 p-safe">
+      <div className="h-screen-safe bg-background flex flex-col items-center justify-center gap-5 px-4 p-safe">
         <button
+          type="button"
           onClick={() => navigate('/lobby')}
           className="absolute top-4 left-4 flex items-center gap-1.5 px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground bg-secondary rounded-lg transition-colors pt-safe pl-safe"
         >
           <ArrowLeft size={13} /> Back to Lobby
         </button>
-        <div className="text-muted-foreground animate-pulse text-center">
-          <div className="mb-2">Connecting to game...</div>
-          <div className="text-xs text-muted-foreground/60">Game ID: {gameId?.slice(0, 8)}</div>
-          {error && (
-            <div className="mt-4 text-destructive text-sm bg-destructive/10 rounded p-2">
-              {error}
-              <button
-                onClick={() => { setError(''); if (user) connect(gameId!, user.id); }}
-                className="block mt-2 text-xs underline hover:no-underline"
-              >
-                Retry
-              </button>
-            </div>
-          )}
+        <div className="w-10 h-10 rounded-full border-2 border-primary/20 border-t-primary animate-spin" />
+        <div className="text-center space-y-1">
+          <p className="text-sm text-foreground font-medium">Connecting to game…</p>
+          <p className="text-xs text-muted-foreground/60 font-mono">{gameId?.slice(0, 8)}</p>
         </div>
+        {error && (
+          <div className="text-destructive text-sm bg-destructive/10 rounded-lg px-4 py-3 text-center space-y-2">
+            <p>{error}</p>
+            <button
+              type="button"
+              onClick={() => { setError(''); if (user) connect(gameId!, user.id); }}
+              className="text-xs underline hover:no-underline"
+            >
+              Retry
+            </button>
+          </div>
+        )}
       </div>
     );
   }
@@ -177,6 +180,7 @@ export default function MultiplayerGamePage() {
         {/* Top bar */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
           <button
+            type="button"
             onClick={handleLeave}
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground bg-secondary rounded-lg transition-colors"
           >
@@ -191,6 +195,7 @@ export default function MultiplayerGamePage() {
 
           {isHost && (
             <button
+              type="button"
               onClick={handleDeleteGame}
               disabled={isDeleting}
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-destructive hover:text-destructive bg-destructive/10 hover:bg-destructive/20 rounded-lg transition-colors disabled:opacity-50"
@@ -241,6 +246,7 @@ export default function MultiplayerGamePage() {
             <div className="bg-surface rounded-xl p-4 shadow-elevated">
               <p className="text-xs text-muted-foreground mb-2">Share this link to invite players:</p>
               <button
+                type="button"
                 onClick={handleCopyLink}
                 className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-secondary text-foreground rounded-lg text-xs font-medium hover:opacity-90 transition-opacity"
               >
@@ -258,6 +264,7 @@ export default function MultiplayerGamePage() {
                     {[1, 2, 3, 4, 5, 6].map(num => (
                       <button
                         key={num}
+                        type="button"
                         onClick={() => setHumanSlots(num)}
                         className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${
                           humanSlots === num ? 'bg-primary text-primary-foreground' : 'bg-secondary text-muted-foreground hover:text-foreground'
@@ -273,6 +280,7 @@ export default function MultiplayerGamePage() {
                 </div>
 
                 <button
+                  type="button"
                   onClick={handleStartGame}
                   disabled={isStarting}
                   className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-primary text-primary-foreground rounded-xl text-base font-bold hover:opacity-90 transition-opacity shadow-glow disabled:opacity-50"
