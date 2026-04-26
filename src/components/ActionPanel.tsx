@@ -1,60 +1,12 @@
 import { useState, useEffect } from 'react';
 import { Drawer as DrawerPrimitive } from 'vaul';
-import { motion, AnimatePresence } from 'framer-motion';
+import { AnimatePresence } from 'framer-motion';
 import { useGameStore } from '../game/store';
 import { PLAYER_NAMES, type RiskCard } from '../game/types';
 import { TERRITORY_MAP } from '../game/mapData';
 import { useIsMobile } from '../hooks/use-mobile';
 import { Swords, Shield, Move, ChevronRight, Dices, Target, ScrollText } from 'lucide-react';
-
-function isValidSet(cards: RiskCard[]): boolean {
-  if (cards.length !== 3) return false;
-  const types = cards.map(c => c.type);
-  const wilds = types.filter(t => t === 'Wild').length;
-  const nonWild = types.filter(t => t !== 'Wild');
-  if (wilds >= 2) return true;
-  if (wilds === 1) return true;
-  if (nonWild[0] === nonWild[1] && nonWild[1] === nonWild[2]) return true;
-  if (new Set(nonWild).size === 3) return true;
-  return false;
-}
-
-const CARD_LABELS: Record<string, string> = {
-  Infantry: '⚔ Infantry',
-  Cavalry: '🐴 Cavalry',
-  Artillery: '💣 Artillery',
-  Wild: '★ Wild',
-};
-
-function DiceDisplay({ rolls, label, color }: { rolls: number[]; label: string; color: string }) {
-  return (
-    <div className="flex items-center gap-2">
-      <span className="text-xs text-muted-foreground w-8">{label}</span>
-      <div className="flex gap-1">
-        {rolls.map((r, i) => (
-          <motion.div key={i}
-            initial={{ y: -10, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ delay: i * 0.08, type: 'spring', stiffness: 400, damping: 15 }}
-            className="w-8 h-8 rounded-md flex items-center justify-center font-mono-tabular text-sm font-bold shadow-elevated"
-            style={{ backgroundColor: color, color: 'white' }}>
-            {r}
-          </motion.div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function findValidSet(cards: RiskCard[]): RiskCard[] | null {
-  for (let i = 0; i < cards.length - 2; i++)
-    for (let j = i + 1; j < cards.length - 1; j++)
-      for (let k = j + 1; k < cards.length; k++) {
-        const combo = [cards[i], cards[j], cards[k]];
-        if (isValidSet(combo)) return combo;
-      }
-  return null;
-}
+import { isValidSet, findValidSet, CARD_LABELS, DiceDisplay } from './cardUtils';
 
 function CardsPanel({
   cards, phase, selectedCardIds, setSelectedCardIds, onTrade,
@@ -103,6 +55,7 @@ function CardsPanel({
               const isDisabled = !isSelected && selectedCardIds.length >= 3;
               return (
                 <button
+                  type="button"
                   key={card.id}
                   onClick={() => toggleCard(card.id)}
                   disabled={!canSelect || isDisabled}
@@ -125,6 +78,7 @@ function CardsPanel({
           {/* One-click trade when forced */}
           {mustTrade && bestSet && selectedCardIds.length === 0 && (
             <button
+              type="button"
               onClick={() => onTrade(bestSet.map(c => c.id))}
               className="w-full px-3 py-1.5 bg-destructive text-destructive-foreground rounded-md text-xs font-medium hover:opacity-90 transition-opacity"
             >
@@ -134,6 +88,7 @@ function CardsPanel({
 
           {canSelect && selectedCardIds.length > 0 && (
             <button
+              type="button"
               onClick={() => onTrade(selectedCardIds)}
               disabled={!canTrade}
               className="w-full px-3 py-1.5 bg-primary text-primary-foreground rounded-md text-xs font-medium hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
@@ -176,6 +131,8 @@ export default function ActionPanel() {
   useEffect(() => { if (awaitingMoveIn) setMoveCount(minMoveIn); }, [awaitingMoveIn, minMoveIn]);
   // Reset fortify slider when selections change (after each fortify move or new selection)
   useEffect(() => { setFortifyCount(1); }, [fortifySource, fortifyTarget]);
+  // Clear stale card selection when the active player changes
+  useEffect(() => { setSelectedCardIds([]); }, [currentPlayerIndex]);
 
   const player = players[currentPlayerIndex];
   const pName = PLAYER_NAMES[currentPlayerIndex];
@@ -257,7 +214,7 @@ export default function ActionPanel() {
             </div>
 
             {reinforcementsLeft === 0 && (
-              <button onClick={endPhase}
+              <button type="button" onClick={endPhase}
                 className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:opacity-90 transition-opacity">
                 <span>Proceed to Attack</span>
                 <ChevronRight size={14} />
@@ -284,7 +241,7 @@ export default function ActionPanel() {
                     className="flex-1 accent-primary" />
                   <span className="font-mono-tabular text-sm text-foreground w-8 text-right">{Math.max(minMoveIn, Math.min(moveCount, Math.max(minMoveIn, maxMoveIn)))}</span>
                 </div>
-                <button onClick={() => { moveArmiesAfterCapture(Math.max(minMoveIn, Math.min(moveCount, Math.max(minMoveIn, maxMoveIn)))); setMoveCount(minMoveIn); }}
+                <button type="button" onClick={() => { moveArmiesAfterCapture(Math.max(minMoveIn, Math.min(moveCount, Math.max(minMoveIn, maxMoveIn)))); setMoveCount(minMoveIn); }}
                   className="w-full px-3 py-1.5 bg-primary text-primary-foreground rounded-md text-xs font-medium hover:opacity-90 transition-opacity">
                   Move In
                 </button>
@@ -336,7 +293,7 @@ export default function ActionPanel() {
             )}
 
             {!awaitingMoveIn && (
-              <button onClick={endPhase}
+              <button type="button" onClick={endPhase}
                 className="w-full flex items-center justify-center gap-2 px-4 py-2 border border-border text-muted-foreground rounded-md text-sm hover:bg-secondary transition-colors">
                 <span>End Attack → Fortify</span>
                 <ChevronRight size={14} />
@@ -348,7 +305,7 @@ export default function ActionPanel() {
         {/* FORTIFY */}
         {phase === 'FORTIFY' && (
           <div className="space-y-3">
-            <div className="flex items-center gap-2 text-primary">
+            <div className="flex items-center gap-2 text-green-400">
               <Move size={16} />
               <span className="text-sm font-medium">Fortify</span>
             </div>
@@ -375,14 +332,14 @@ export default function ActionPanel() {
                     className="flex-1 accent-primary" />
                   <span className="font-mono-tabular text-sm text-foreground w-8 text-right">{Math.min(fortifyCount, Math.max(1, maxFortify))}</span>
                 </div>
-                <button onClick={() => { executeFortify(Math.min(fortifyCount, Math.max(1, maxFortify))); }}
+                <button type="button" onClick={() => { executeFortify(Math.min(fortifyCount, Math.max(1, maxFortify))); }}
                   className="w-full px-3 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:opacity-90 transition-opacity">
-                  Move {fortifyCount} Armies
+                  Move {Math.min(fortifyCount, Math.max(1, maxFortify))} Armies
                 </button>
               </div>
             )}
 
-            <button onClick={endPhase}
+            <button type="button" onClick={endPhase}
               className="w-full flex items-center justify-center gap-2 px-4 py-2 border border-border text-muted-foreground rounded-md text-sm hover:bg-secondary transition-colors">
               <span>End Turn</span>
               <ChevronRight size={14} />
