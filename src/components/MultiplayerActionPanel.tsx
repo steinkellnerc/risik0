@@ -119,7 +119,7 @@ export default function MultiplayerActionPanel() {
     phase, currentPlayerIndex, reinforcementsLeft, attackSource, attackTarget,
     fortifySource, fortifyTarget, lastDiceRoll, territories, players, awaitingMoveIn,
     capturedTerritory, captureSource: captureSourceId, minMoveIn, endPhase, executeAttack, executeFortify, moveArmiesAfterCapture,
-    tradeInCards, log, isMyTurn, mySlotIndex, myUserId, hostUserId, kickAI,
+    tradeInCards, log, isMyTurn, mySlotIndex, myUserId, hostUserId, kickAI, winnerId,
   } = useMultiplayerStore();
 
   const [moveCount, setMoveCount] = useState(1);
@@ -148,6 +148,9 @@ export default function MultiplayerActionPanel() {
   // Move-in after capture — armies come only from the attacking territory
   const captureSourceState = captureSourceId ? territories[captureSourceId] : null;
   const maxMoveIn = captureSourceState ? captureSourceState.armies - 1 : 1;
+
+  // Game over — hide action panel so the map is fully visible for review
+  if (winnerId) return null;
 
   // Secret mission for current user
   const myMission = myPlayer?.secretObjective;

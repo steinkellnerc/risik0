@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useMultiplayerStore } from '../game/multiplayerStore';
-import { Clock, Home, Sword, Square, Target } from 'lucide-react';
+import { Clock, Home, Sword, Square, Target, X, Trophy } from 'lucide-react';
 
 const PLAYER_BG = [
   'bg-player-1', 'bg-player-2', 'bg-player-3', 'bg-player-4', 'bg-player-5', 'bg-player-6',
@@ -19,6 +19,7 @@ export default function MultiplayerStatusBar() {
     : null;
   const navigate = useNavigate();
   const [confirmLeave, setConfirmLeave] = useState(false);
+  const [winScreenOpen, setWinScreenOpen] = useState(true);
 
   const playerTerritories = (idx: number) =>
     Object.values(territories).filter(t => t.ownerId === idx).length;
@@ -34,50 +35,128 @@ export default function MultiplayerStatusBar() {
 
   if (winnerId) {
     const winner = players.find(p => p.userId === winnerId || p.id === winnerId);
+    const standings = [...players].sort((a, b) => playerTerritories(b.slotIndex) - playerTerritories(a.slotIndex));
+
     return (
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-6 bg-background/95 backdrop-blur-sm px-4 overflow-y-auto py-8"
-      >
-        <motion.div
-          initial={{ scale: 0.7, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ delay: 0.1, type: 'spring', stiffness: 260, damping: 18 }}
-          className="text-7xl"
-        >
-          🏆
-        </motion.div>
-        <div className="text-center space-y-2">
-          <h1 className="text-3xl font-bold text-foreground">{winner?.displayName || 'Unknown'} wins!</h1>
-          {useMissions && winner?.secretObjective && (
-            <p className="text-sm text-primary font-medium">Mission: {winner.secretObjective}</p>
+      <>
+        {/* Reopen pill — shown when modal is hidden */}
+        <AnimatePresence>
+          {!winScreenOpen && (
+            <motion.button
+              type="button"
+              onClick={() => setWinScreenOpen(true)}
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="fixed top-3 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary text-primary-foreground text-xs font-semibold shadow-glow hover:opacity-90"
+            >
+              <Trophy size={12} />
+              {winner?.displayName || 'Unknown'} wins — view results
+            </motion.button>
           )}
-        </div>
-        {useMissions && (
-          <div className="w-full max-w-sm bg-surface rounded-xl p-4 space-y-2 shadow-elevated">
-            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">All missions revealed</span>
-            {players.map(p => (
-              <div key={p.slotIndex} className="flex items-start gap-2 text-xs">
-                <div className={`w-2 h-2 rounded-full mt-0.5 shrink-0 ${PLAYER_BG[p.slotIndex]}`} />
-                <span className={`font-semibold shrink-0 ${p.userId === winnerId ? 'text-primary' : 'text-muted-foreground'}`}>
-                  {p.isAi ? 'AI ' : ''}{p.displayName}:
-                </span>
-                <span className={p.userId === winnerId ? 'text-primary' : 'text-foreground/80'}>
-                  {p.secretObjective ?? '—'}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
-        <button
-          type="button"
-          onClick={handleLeave}
-          className="flex items-center gap-1.5 px-5 py-2.5 text-sm font-semibold bg-primary text-primary-foreground rounded-xl hover:opacity-90 transition-opacity shadow-glow"
-        >
-          <Home size={14} /> Back to Lobby
-        </button>
-      </motion.div>
+        </AnimatePresence>
+
+        {/* Dismissible modal */}
+        <AnimatePresence>
+          {winScreenOpen && (
+            <motion.div
+              key="win-modal"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-50 flex items-center justify-center px-4 py-6 bg-background/55 backdrop-blur-[2px]"
+              onClick={() => setWinScreenOpen(false)}
+            >
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0, y: 10 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                exit={{ scale: 0.95, opacity: 0 }}
+                transition={{ type: 'spring', stiffness: 260, damping: 22 }}
+                onClick={e => e.stopPropagation()}
+                className="relative w-full max-w-sm max-h-[88vh] overflow-y-auto bg-surface rounded-2xl p-5 space-y-4 shadow-elevated border border-border"
+              >
+                {/* Close */}
+                <button
+                  type="button"
+                  onClick={() => setWinScreenOpen(false)}
+                  aria-label="Hide results"
+                  className="absolute top-2.5 right-2.5 p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+                >
+                  <X size={14} />
+                </button>
+
+                {/* Winner */}
+                <div className="text-center space-y-2 pt-2">
+                  <div className="text-5xl">🏆</div>
+                  <h1 className="text-2xl font-bold text-foreground">{winner?.displayName || 'Unknown'} wins!</h1>
+                  {useMissions && winner?.secretObjective && (
+                    <p className="text-xs text-primary font-medium">Mission: {winner.secretObjective}</p>
+                  )}
+                </div>
+
+                {/* Final standings */}
+                <div className="bg-muted/40 rounded-lg p-3 space-y-1.5">
+                  <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Final standings</span>
+                  {standings.map((p, idx) => {
+                    const isWinner = p.userId === winnerId || p.id === winnerId;
+                    return (
+                      <div key={p.slotIndex} className="flex items-center gap-2 text-xs font-mono-tabular">
+                        <span className="w-3 text-muted-foreground">{idx + 1}</span>
+                        <div className={`w-2 h-2 rounded-full shrink-0 ${PLAYER_BG[p.slotIndex]}`} />
+                        <span className={`font-sans flex-1 truncate ${isWinner ? 'text-primary font-semibold' : p.eliminated ? 'text-muted-foreground line-through' : 'text-foreground'}`}>
+                          {p.isAi ? 'AI ' : ''}{p.displayName}
+                        </span>
+                        <span className="text-foreground">{playerTerritories(p.slotIndex)}</span>
+                        <Square size={9} className="text-muted-foreground/60" />
+                        <span className="text-foreground">{playerArmies(p.slotIndex)}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Missions */}
+                {useMissions && (
+                  <div className="bg-muted/40 rounded-lg p-3 space-y-1.5">
+                    <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">All missions revealed</span>
+                    {players.map(p => {
+                      const isWinner = p.userId === winnerId || p.id === winnerId;
+                      return (
+                        <div key={p.slotIndex} className="flex items-start gap-2 text-xs">
+                          <div className={`w-2 h-2 rounded-full mt-1 shrink-0 ${PLAYER_BG[p.slotIndex]}`} />
+                          <span className={`font-semibold shrink-0 ${isWinner ? 'text-primary' : 'text-muted-foreground'}`}>
+                            {p.isAi ? 'AI ' : ''}{p.displayName}:
+                          </span>
+                          <span className={isWinner ? 'text-primary' : 'text-foreground/80'}>
+                            {p.secretObjective ?? '—'}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Actions */}
+                <div className="flex gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setWinScreenOpen(false)}
+                    className="flex-1 px-3 py-2 text-xs font-semibold bg-secondary text-foreground rounded-lg hover:bg-secondary/80 transition-colors"
+                  >
+                    Review map
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleLeave}
+                    className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity shadow-glow"
+                  >
+                    <Home size={12} /> Back to Lobby
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </>
     );
   }
 

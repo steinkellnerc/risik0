@@ -230,8 +230,8 @@ export default function GameMap({ multiplayer = false }: { multiplayer?: boolean
   const selectFortifySource = multiplayer ? mpStore.selectFortifySource : localStore.selectFortifySource;
   const selectFortifyTarget = multiplayer ? mpStore.selectFortifyTarget : localStore.selectFortifyTarget;
 
-  // In multiplayer, only allow interaction if it's my turn
-  const isReadOnly = multiplayer && !mpStore.isMyTurn;
+  // In multiplayer, only allow interaction if it's my turn (and game isn't over)
+  const isReadOnly = multiplayer && (!mpStore.isMyTurn || !!mpStore.winnerId);
 
   const handleTerritoryClick = (tid: string) => {
     if (isReadOnly) return;
