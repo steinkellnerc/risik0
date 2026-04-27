@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useGameStore } from '../game/store';
 import { PLAYER_NAMES } from '../game/types';
-import { Home, Square } from 'lucide-react';
+import { Home, Square, X, Trophy } from 'lucide-react';
 
 const PLAYER_BG = [
   'bg-player-1', 'bg-player-2', 'bg-player-3', 'bg-player-4', 'bg-player-5', 'bg-player-6',
@@ -12,6 +12,7 @@ const PLAYER_BG = [
 export default function StatusBar() {
   const navigate = useNavigate();
   const [confirmLeave, setConfirmLeave] = useState(false);
+  const [winScreenOpen, setWinScreenOpen] = useState(true);
   const { currentPlayerIndex, phase, turn, players, territories, reinforcementsLeft, winner, useMissions, missions, initGame } = useGameStore();
 
   const playerTerritories = (idx: number) =>
@@ -21,57 +22,134 @@ export default function StatusBar() {
 
   if (winner !== null) {
     const winnerMission = useMissions ? missions[winner] : null;
+    const standings = players
+      .map((p, i) => ({ p, i, terr: playerTerritories(i), army: playerArmies(i) }))
+      .sort((a, b) => b.terr - a.terr);
+
     return (
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-6 bg-background/95 backdrop-blur-sm px-4 overflow-y-auto py-8"
-      >
-        <motion.div
-          initial={{ scale: 0.7, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ delay: 0.1, type: 'spring', stiffness: 260, damping: 18 }}
-          className="text-7xl"
-        >
-          🏆
-        </motion.div>
-        <div className="text-center space-y-2">
-          <h1 className="text-3xl font-bold text-foreground">{PLAYER_NAMES[winner]} wins!</h1>
-          {winnerMission && (
-            <p className="text-sm text-primary font-medium">Mission: {winnerMission.description}</p>
+      <>
+        {/* Reopen pill — shown when modal is hidden */}
+        <AnimatePresence>
+          {!winScreenOpen && (
+            <motion.button
+              type="button"
+              onClick={() => setWinScreenOpen(true)}
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="fixed top-3 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary text-primary-foreground text-xs font-semibold shadow-glow hover:opacity-90"
+            >
+              <Trophy size={12} />
+              {PLAYER_NAMES[winner]} wins — view results
+            </motion.button>
           )}
-        </div>
-        {useMissions && (
-          <div className="w-full max-w-sm bg-surface rounded-xl p-4 space-y-2 shadow-elevated">
-            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">All missions revealed</span>
-            {players.map((p, i) => (
-              <div key={i} className="flex items-start gap-2 text-xs">
-                <div className={`w-2 h-2 rounded-full mt-0.5 shrink-0 ${PLAYER_BG[i]}`} />
-                <span className={`font-semibold shrink-0 ${i === winner ? 'text-primary' : 'text-muted-foreground'}`}>
-                  {p.isAI ? '🤖 ' : ''}{p.name}:
-                </span>
-                <span className={i === winner ? 'text-primary' : 'text-foreground/80'}>
-                  {missions[i]?.description ?? '—'}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
-        <div className="flex gap-3">
-          <button
-            onClick={() => navigate('/')}
-            className="px-4 py-2 text-sm font-semibold bg-secondary text-foreground rounded-xl hover:bg-secondary/80 transition-colors"
-          >
-            Return to Lobby
-          </button>
-          <button
-            onClick={() => initGame(players.filter(p => !p.isAI).length, useMissions)}
-            className="px-4 py-2 text-sm font-semibold bg-primary text-primary-foreground rounded-xl hover:opacity-90 transition-opacity shadow-glow"
-          >
-            Play Again
-          </button>
-        </div>
-      </motion.div>
+        </AnimatePresence>
+
+        {/* Dismissible modal */}
+        <AnimatePresence>
+          {winScreenOpen && (
+            <motion.div
+              key="win-modal"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-50 flex items-center justify-center px-4 py-6 bg-background/55 backdrop-blur-[2px]"
+              onClick={() => setWinScreenOpen(false)}
+            >
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0, y: 10 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                exit={{ scale: 0.95, opacity: 0 }}
+                transition={{ type: 'spring', stiffness: 260, damping: 22 }}
+                onClick={e => e.stopPropagation()}
+                className="relative w-full max-w-sm max-h-[88vh] overflow-y-auto bg-surface rounded-2xl p-5 space-y-4 shadow-elevated border border-border"
+              >
+                {/* Close */}
+                <button
+                  type="button"
+                  onClick={() => setWinScreenOpen(false)}
+                  aria-label="Hide results"
+                  className="absolute top-2.5 right-2.5 p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+                >
+                  <X size={14} />
+                </button>
+
+                {/* Winner */}
+                <div className="text-center space-y-2 pt-2">
+                  <div className="text-5xl">🏆</div>
+                  <h1 className="text-2xl font-bold text-foreground">{PLAYER_NAMES[winner]} wins!</h1>
+                  {winnerMission && (
+                    <p className="text-xs text-primary font-medium">Mission: {winnerMission.description}</p>
+                  )}
+                </div>
+
+                {/* Final standings */}
+                <div className="bg-muted/40 rounded-lg p-3 space-y-1.5">
+                  <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Final standings</span>
+                  {standings.map(({ p, i, terr, army }, rank) => {
+                    const isWinner = i === winner;
+                    return (
+                      <div key={i} className="flex items-center gap-2 text-xs font-mono-tabular">
+                        <span className="w-3 text-muted-foreground">{rank + 1}</span>
+                        <div className={`w-2 h-2 rounded-full shrink-0 ${PLAYER_BG[i]}`} />
+                        <span className={`font-sans flex-1 truncate ${isWinner ? 'text-primary font-semibold' : p.eliminated ? 'text-muted-foreground line-through' : 'text-foreground'}`}>
+                          {p.isAI ? '🤖 ' : ''}{p.name}
+                        </span>
+                        <span className="text-foreground">{terr}</span>
+                        <Square size={9} className="text-muted-foreground/60" />
+                        <span className="text-foreground">{army}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Missions */}
+                {useMissions && (
+                  <div className="bg-muted/40 rounded-lg p-3 space-y-1.5">
+                    <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">All missions revealed</span>
+                    {players.map((p, i) => (
+                      <div key={i} className="flex items-start gap-2 text-xs">
+                        <div className={`w-2 h-2 rounded-full mt-1 shrink-0 ${PLAYER_BG[i]}`} />
+                        <span className={`font-semibold shrink-0 ${i === winner ? 'text-primary' : 'text-muted-foreground'}`}>
+                          {p.isAI ? '🤖 ' : ''}{p.name}:
+                        </span>
+                        <span className={i === winner ? 'text-primary' : 'text-foreground/80'}>
+                          {missions[i]?.description ?? '—'}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Actions */}
+                <div className="flex gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setWinScreenOpen(false)}
+                    className="flex-1 px-3 py-2 text-xs font-semibold bg-secondary text-foreground rounded-lg hover:bg-secondary/80 transition-colors"
+                  >
+                    Review map
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => navigate('/')}
+                    className="flex-1 px-3 py-2 text-xs font-semibold bg-secondary text-foreground rounded-lg hover:bg-secondary/80 transition-colors"
+                  >
+                    Lobby
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => initGame(players.filter(p => !p.isAI).length, useMissions)}
+                    className="flex-1 px-3 py-2 text-xs font-semibold bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity shadow-glow"
+                  >
+                    Play Again
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </>
     );
   }
 

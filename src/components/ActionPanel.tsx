@@ -119,7 +119,7 @@ export default function ActionPanel() {
     phase, currentPlayerIndex, reinforcementsLeft, attackSource, attackTarget,
     fortifySource, fortifyTarget, lastDiceRoll, territories, players, awaitingMoveIn,
     capturedTerritory, captureSource: captureSourceId, minMoveIn, endPhase, executeAttack, executeFortify, moveArmiesAfterCapture,
-    tradeInCards, log, missions, useMissions,
+    tradeInCards, log, missions, useMissions, winner,
   } = useGameStore();
 
   const [moveCount, setMoveCount] = useState(1);
@@ -144,6 +144,9 @@ export default function ActionPanel() {
 
   const fortifySourceState = fortifySource ? territories[fortifySource] : null;
   const maxFortify = fortifySourceState ? fortifySourceState.armies - 1 : 0;
+
+  // Game over — hide action panel so the map is fully visible for review
+  if (winner !== null) return null;
 
   // Move-in after capture — armies come only from the attacking territory
   const captureSourceState = captureSourceId ? territories[captureSourceId] : null;
