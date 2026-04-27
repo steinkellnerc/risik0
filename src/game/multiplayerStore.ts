@@ -625,7 +625,7 @@ export const useMultiplayerStore = create<MultiplayerGameState>((set, get) => ({
           const wId = winnerPlayer ? (winnerPlayer.userId ?? winnerPlayer.id) : null;
           if (wId) {
             set({ winnerId: wId });
-            await updateGame(s.gameId, { winner_id: wId, status: 'finished' });
+            await updateGame(s.gameId, { winner_id: wId, status: 'COMPLETED' });
             await addGameLog(s.gameId, s.currentPlayerIndex, `${winnerPlayer?.displayName} wins by completing their mission!`, 'win');
             return;
           }
@@ -672,7 +672,7 @@ export const useMultiplayerStore = create<MultiplayerGameState>((set, get) => ({
           const wId = winnerPlayer ? (winnerPlayer.userId ?? winnerPlayer.id) : null;
           if (wId) {
             set({ winnerId: wId });
-            await updateGame(s.gameId, { winner_id: wId, status: 'finished' });
+            await updateGame(s.gameId, { winner_id: wId, status: 'COMPLETED' });
             await addGameLog(s.gameId, s.currentPlayerIndex, `${winnerPlayer?.displayName} wins by completing their mission!`, 'win');
             return;
           }

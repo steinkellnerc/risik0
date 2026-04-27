@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
-import { createGame, listOpenGames, listMyActiveGames, joinGame, cancelGame } from '../lib/multiplayerSync';
-import { LogOut, Plus, Users, RefreshCw, Gamepad2, Target, Crown, Trash2 } from 'lucide-react';
+import { createGame, listOpenGames, listMyActiveGames, joinGame, cancelGame, getLeaderboard, type LeaderboardEntry } from '../lib/multiplayerSync';
+import { LogOut, Plus, Users, RefreshCw, Gamepad2, Target, Crown, Trash2, Trophy, Sparkles } from 'lucide-react';
 
 type GameEntry = {
   id: string;
@@ -19,6 +19,7 @@ export default function LobbyPage() {
   const navigate = useNavigate();
   const [games, setGames] = useState<GameEntry[]>([]);
   const [activeGames, setActiveGames] = useState<Array<{ id: string; playerCount: number; useMissions: boolean; turnNumber: number; hostUserId: string | null }>>([]);
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
   const [useMissions, setUseMissions] = useState(true);
@@ -29,12 +30,14 @@ export default function LobbyPage() {
   const refreshGames = async () => {
     setLoading(true);
     try {
-      const [open, active] = await Promise.all([
+      const [open, active, board] = await Promise.all([
         listOpenGames(user?.id),
         user?.id ? listMyActiveGames(user.id) : Promise.resolve([]),
+        getLeaderboard(20),
       ]);
       setGames(open);
       setActiveGames(active);
+      setLeaderboard(board);
     } catch {
       // ignore
     } finally {
@@ -105,17 +108,34 @@ export default function LobbyPage() {
   );
 
   return (
-    <div className="h-screen-safe bg-background flex flex-col overflow-hidden pt-safe pb-safe">
+    <div className="h-screen-safe flex flex-col overflow-hidden pt-safe pb-safe relative bg-background">
+      {/* Gradient backdrop — subtle blue glow behind hero, fades to background */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 top-0 h-[420px] z-0"
+        style={{
+          background:
+            'radial-gradient(ellipse 80% 60% at 50% 0%, hsl(210 100% 50% / 0.18), transparent 70%), linear-gradient(to bottom, hsl(222 47% 10%), transparent)',
+        }}
+      />
 
       {/* Fixed top — header + create game */}
-      <div className="flex-none border-b border-border bg-background px-4 pt-5 pb-4">
+      <div className="flex-none px-4 pt-5 pb-4 relative z-10">
         <div className="max-w-lg mx-auto space-y-4">
           <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
             {/* Header */}
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h1 className="text-3xl font-bold text-foreground tracking-tight">RISK</h1>
-                <p className="text-muted-foreground text-sm">Welcome, {displayName}</p>
+            <div className="flex items-start justify-between mb-3">
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <h1 className="text-4xl font-bold text-foreground tracking-tight">RISK</h1>
+                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-primary/15 text-primary border border-primary/30">
+                    <Sparkles size={10} /> Free for friends
+                  </span>
+                </div>
+                <p className="text-foreground/80 text-sm leading-snug max-w-xs">
+                  Strategic world conquest with friends — reinforce, attack, fortify. Last empire standing wins.
+                </p>
+                <p className="text-muted-foreground text-xs">Welcome back, <span className="text-foreground font-medium">{displayName}</span></p>
               </div>
               <button onClick={signOut} className="flex items-center gap-1 px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground bg-secondary rounded-lg transition-colors">
                 <LogOut size={12} /> Sign Out
@@ -123,7 +143,7 @@ export default function LobbyPage() {
             </div>
 
             {/* Create game */}
-            <div className="bg-surface rounded-xl p-4 space-y-3 shadow-elevated">
+            <div className="bg-surface-elevated rounded-xl p-4 space-y-3 shadow-elevated border border-border/60">
               <div className="flex items-center gap-2 text-foreground">
                 <Plus size={15} />
                 <span className="text-sm font-semibold">Create New Game</span>
@@ -145,7 +165,7 @@ export default function LobbyPage() {
       </div>
 
       {/* Scrollable games list */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto relative z-10">
         <div className="max-w-lg mx-auto px-4 py-4 space-y-4">
 
           {/* My games */}
@@ -243,6 +263,57 @@ export default function LobbyPage() {
           <button type="button" onClick={() => navigate('/local')} className="w-full flex items-center justify-center gap-2 px-4 py-2.5 border border-border text-muted-foreground rounded-xl text-sm hover:bg-secondary transition-colors">
             <Gamepad2 size={16} /> Play Local (Single Device)
           </button>
+
+          {/* Leaderboard */}
+          <div className="bg-surface rounded-xl p-4 space-y-3 shadow-elevated">
+            <div className="flex items-center gap-2">
+              <Trophy size={15} className="text-amber-400" />
+              <span className="text-sm font-semibold text-foreground">Leaderboard</span>
+              <span className="text-xs text-muted-foreground ml-auto">All-time wins</span>
+            </div>
+
+            {leaderboard.length === 0 ? (
+              <div className="flex flex-col items-center gap-2 py-4 text-muted-foreground">
+                <Trophy size={20} className="opacity-30" />
+                <p className="text-xs text-center">No completed games yet — be the first to claim victory!</p>
+              </div>
+            ) : (
+              <div className="overflow-hidden rounded-lg border border-border/60">
+                <table className="w-full font-mono-tabular">
+                  <thead>
+                    <tr className="bg-muted/40 text-[10px] uppercase tracking-wider text-muted-foreground">
+                      <th className="text-left font-semibold px-2 py-1.5 w-7">#</th>
+                      <th className="text-left font-semibold px-2 py-1.5">Player</th>
+                      <th className="text-right font-semibold px-2 py-1.5">Played</th>
+                      <th className="text-right font-semibold px-2 py-1.5">Won</th>
+                      <th className="text-right font-semibold px-2 py-1.5 pr-3">Win %</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {leaderboard.map((entry, idx) => {
+                      const isMe = entry.userId === user?.id;
+                      return (
+                        <tr
+                          key={entry.userId}
+                          className={`border-t border-border/40 text-xs ${isMe ? 'bg-primary/10' : ''}`}
+                        >
+                          <td className="px-2 py-1.5 text-muted-foreground">
+                            {idx === 0 ? <Trophy size={11} className="text-amber-400" /> : idx + 1}
+                          </td>
+                          <td className={`px-2 py-1.5 font-sans truncate max-w-[140px] ${isMe ? 'text-primary font-semibold' : 'text-foreground'}`}>
+                            {entry.displayName}{isMe && <span className="text-muted-foreground font-normal"> (you)</span>}
+                          </td>
+                          <td className="px-2 py-1.5 text-right text-muted-foreground">{entry.gamesPlayed}</td>
+                          <td className="px-2 py-1.5 text-right text-foreground font-semibold">{entry.gamesWon}</td>
+                          <td className="px-2 py-1.5 pr-3 text-right text-muted-foreground">{Math.round(entry.winRate * 100)}%</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
 
           {error && (
             <div className="text-destructive text-sm text-center bg-destructive/10 rounded-lg px-3 py-2">{error}</div>

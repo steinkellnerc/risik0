@@ -513,3 +513,56 @@ export async function cancelGame(gameId: string): Promise<void> {
     .eq('id', gameId);
   if (error) throw new Error(error.message);
 }
+
+// ==================== LEADERBOARD ====================
+
+export interface LeaderboardEntry {
+  userId: string;
+  displayName: string;
+  gamesPlayed: number;
+  gamesWon: number;
+  winRate: number;
+}
+
+export async function getLeaderboard(limit = 20): Promise<LeaderboardEntry[]> {
+  const { data, error } = await supabase
+    .from('games')
+    .select('id, winner_id, players(user_id, display_name, is_ai)')
+    .eq('status', 'COMPLETED')
+    .order('created_at', { ascending: false })
+    .limit(500);
+
+  if (error || !data) return [];
+
+  const stats = new Map<string, { displayName: string; played: number; won: number }>();
+
+  for (const game of data as Array<{
+    id: string;
+    winner_id: string | null;
+    players: Array<{ user_id: string | null; display_name: string; is_ai: boolean }> | null;
+  }>) {
+    for (const p of game.players ?? []) {
+      if (p.is_ai || !p.user_id) continue;
+      const entry = stats.get(p.user_id) ?? { displayName: p.display_name, played: 0, won: 0 };
+      entry.played += 1;
+      entry.displayName = p.display_name;
+      if (game.winner_id && game.winner_id === p.user_id) entry.won += 1;
+      stats.set(p.user_id, entry);
+    }
+  }
+
+  return Array.from(stats.entries())
+    .map(([userId, s]) => ({
+      userId,
+      displayName: s.displayName,
+      gamesPlayed: s.played,
+      gamesWon: s.won,
+      winRate: s.played > 0 ? s.won / s.played : 0,
+    }))
+    .sort((a, b) =>
+      b.gamesWon - a.gamesWon ||
+      b.winRate - a.winRate ||
+      b.gamesPlayed - a.gamesPlayed
+    )
+    .slice(0, limit);
+}
