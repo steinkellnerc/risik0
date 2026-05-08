@@ -2,10 +2,15 @@ import { create } from 'zustand';
 import { GameState, Phase, Player, TerritoryState, RiskCard, CardType, Mission, PLAYER_NAMES, PLAYER_COLORS, getTradeInValue } from './types';
 import { TERRITORIES, CONTINENTS, TERRITORY_MAP } from './mapData';
 import { aiReinforce, aiDecideAttacks, aiFortify } from './ai';
-import { assignMissions, checkMissionComplete } from './missions';
+import { assignMissions } from './missions';
+import { evaluateWinner } from './gameEngine';
 
 function rollDie(): number {
   return Math.floor(Math.random() * 6) + 1;
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 function shuffleArray<T>(arr: T[]): T[] {
@@ -77,7 +82,7 @@ export interface GameStore extends GameState {
   executeFortify: (count: number) => void;
   endPhase: () => void;
   addLog: (message: string) => void;
-  runAITurn: () => void;
+  runAITurn: () => Promise<void>;
   deck: RiskCard[];
   capturedTerritory: string | null;
   captureSource: string | null;
@@ -286,8 +291,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     get().addLog(`Attack: ${aRolls.join(',')} vs ${dRolls.join(',')} — Lost A:${aLoss} D:${dLoss}${captured ? ' CAPTURED!' : ''}`);
 
     const defenderId = targetState.ownerId;
-    let winner: number | null = null;
-    let newPlayers = [...s.players];
+    const newPlayers = [...s.players];
 
     if (captured) {
       const defenderStillHas = Object.values(newTerritories).some(t => t.ownerId === defenderId);
@@ -300,32 +304,16 @@ export const useGameStore = create<GameStore>((set, get) => ({
         newPlayers[defenderId] = { ...newPlayers[defenderId], cards: [] };
         get().addLog(`${PLAYER_NAMES[defenderId]} eliminated!`);
       }
+    }
 
-      // Check win conditions
-      const allOwned = Object.values(newTerritories).every(t => t.ownerId === s.currentPlayerIndex);
-      if (allOwned) {
-        winner = s.currentPlayerIndex;
-      } else if (s.useMissions) {
-        const eliminated = newPlayers.map(p => p.eliminated);
-        // Check attacker's mission
-        if (s.missions[s.currentPlayerIndex] && checkMissionComplete(s.currentPlayerIndex, s.missions[s.currentPlayerIndex], newTerritories, eliminated)) {
-          winner = s.currentPlayerIndex;
-          get().addLog(`🎯 ${PLAYER_NAMES[s.currentPlayerIndex]} completed their secret mission!`);
-        }
-        // If defender was just eliminated, check all other players whose mission is to destroy them
-        if (winner === null && newPlayers[defenderId].eliminated) {
-          for (let p = 0; p < newPlayers.length; p++) {
-            if (p === s.currentPlayerIndex) continue;
-            if (newPlayers[p].eliminated) continue;
-            const m = s.missions[p];
-            if (m && checkMissionComplete(p, m, newTerritories, eliminated)) {
-              winner = p;
-              get().addLog(`🎯 ${PLAYER_NAMES[p]} completed their secret mission!`);
-              break;
-            }
-          }
-        }
-      }
+    const eliminatedAfter = newPlayers.map(p => p.eliminated);
+    const winner = captured
+      ? evaluateWinner(newTerritories, eliminatedAfter, s.missions, s.useMissions, s.currentPlayerIndex)
+      : null;
+    if (winner !== null) {
+      get().addLog(winner === s.currentPlayerIndex
+        ? `🎯 ${PLAYER_NAMES[winner]} completed their secret mission!`
+        : `🎯 ${PLAYER_NAMES[winner]} wins — their target was destroyed!`);
     }
 
     set({
@@ -418,14 +406,12 @@ export const useGameStore = create<GameStore>((set, get) => ({
     if (s.phase === 'REINFORCE' && s.reinforcementsLeft > 0) return;
 
     if (s.phase === 'REINFORCE') {
-      // Check mission completion after all reinforcements are placed
-      if (s.useMissions && s.missions[s.currentPlayerIndex]) {
-        const eliminated = s.players.map(p => p.eliminated);
-        if (checkMissionComplete(s.currentPlayerIndex, s.missions[s.currentPlayerIndex], s.territories, eliminated)) {
-          set({ winner: s.currentPlayerIndex });
-          get().addLog(`${PLAYER_NAMES[s.currentPlayerIndex]} completed their secret mission!`);
-          return;
-        }
+      const eliminated = s.players.map(p => p.eliminated);
+      const winner = evaluateWinner(s.territories, eliminated, s.missions, s.useMissions, s.currentPlayerIndex);
+      if (winner !== null) {
+        set({ winner });
+        get().addLog(`${PLAYER_NAMES[winner]} completed their secret mission!`);
+        return;
       }
       set({ phase: 'ATTACK', attackSource: null, attackTarget: null, lastDiceRoll: null });
       get().addLog('Attack phase');
@@ -443,14 +429,12 @@ export const useGameStore = create<GameStore>((set, get) => ({
       set({ phase: 'FORTIFY', fortifySource: null, fortifyTarget: null, attackSource: null, attackTarget: null });
       get().addLog('Fortify phase');
     } else if (s.phase === 'FORTIFY') {
-      // Check mission completion after fortify (e.g. 18 territories with 2 armies)
-      if (s.useMissions && s.missions[s.currentPlayerIndex]) {
-        const eliminated = s.players.map(p => p.eliminated);
-        if (checkMissionComplete(s.currentPlayerIndex, s.missions[s.currentPlayerIndex], s.territories, eliminated)) {
-          set({ winner: s.currentPlayerIndex });
-          get().addLog(`${PLAYER_NAMES[s.currentPlayerIndex]} completed their secret mission!`);
-          return;
-        }
+      const eliminated = s.players.map(p => p.eliminated);
+      const winner = evaluateWinner(s.territories, eliminated, s.missions, s.useMissions, s.currentPlayerIndex);
+      if (winner !== null) {
+        set({ winner });
+        get().addLog(`${PLAYER_NAMES[winner]} completed their secret mission!`);
+        return;
       }
       let next = (s.currentPlayerIndex + 1) % 6;
       while (s.players[next].eliminated) {
@@ -478,80 +462,97 @@ export const useGameStore = create<GameStore>((set, get) => ({
     }
   },
 
-  runAITurn: () => {
+  runAITurn: async () => {
     const s = get();
     const player = s.players[s.currentPlayerIndex];
     if (!player.isAI) return;
 
+    const playerIndex = s.currentPlayerIndex;
+    const turnAtStart = s.turn;
+    // Bail if state moved on (game ended, turn advanced, etc.) — avoids stale loops.
+    const stillMyTurn = () =>
+      get().winner === null && get().currentPlayerIndex === playerIndex && get().turn === turnAtStart;
+
     // Mandatory: trade until < 5 cards. Then optionally trade if >= 3.
-    let currentCards = get().players[s.currentPlayerIndex].cards;
+    let currentCards = get().players[playerIndex].cards;
     while (currentCards.length >= 5) {
       const validSet = findValidSet(currentCards);
       if (!validSet) break;
       get().tradeInCards(validSet.map(c => c.id));
-      currentCards = get().players[s.currentPlayerIndex].cards;
+      currentCards = get().players[playerIndex].cards;
     }
     if (currentCards.length >= 3) {
       const validSet = findValidSet(currentCards);
       if (validSet) get().tradeInCards(validSet.map(c => c.id));
     }
 
-    // Reinforce
-    const reinforceActions = aiReinforce(s.currentPlayerIndex, get().territories, get().reinforcementsLeft);
+    // Reinforce — drop armies one at a time so the player can see them land.
+    const reinforceActions = aiReinforce(playerIndex, get().territories, get().reinforcementsLeft);
     for (const action of reinforceActions) {
+      if (!stillMyTurn()) return;
       get().placeReinforcement(action.territoryId);
+      await delay(60);
     }
 
     // Move to attack phase (placeReinforcement auto-advances on last placement, avoid double-advance)
     if (get().phase === 'REINFORCE') {
       get().endPhase();
     }
+    if (!stillMyTurn()) return;
+    await delay(150);
 
     // Attack — re-evaluate each round so AI adapts as territories change
     let attacksThisTurn = 0;
     const MAX_ATTACKS = 20;
-    while (attacksThisTurn < MAX_ATTACKS) {
-      const freshAttacks = aiDecideAttacks(s.currentPlayerIndex, get().territories);
+    while (attacksThisTurn < MAX_ATTACKS && stillMyTurn()) {
+      const freshAttacks = aiDecideAttacks(playerIndex, get().territories);
       if (freshAttacks.length === 0) break;
 
       const attack = freshAttacks[0];
       const currentTerritories = get().territories;
       const src = currentTerritories[attack.source];
       const tgt = currentTerritories[attack.target];
-      if (!src || !tgt || src.ownerId !== s.currentPlayerIndex || tgt.ownerId === s.currentPlayerIndex) break;
+      if (!src || !tgt || src.ownerId !== playerIndex || tgt.ownerId === playerIndex) break;
       if (src.armies < 2) break;
 
       get().selectAttackSource(attack.source);
       get().selectAttackTarget(attack.target);
+      await delay(120);
       const maxDice = Math.min(3, get().territories[attack.source].armies - 1);
       const defDice = Math.min(2, get().territories[attack.target].armies);
       if (maxDice < 1 || defDice < 1) break;
 
       get().executeAttack(maxDice, defDice);
       attacksThisTurn++;
+      await delay(180); // let the dice + lost-armies render
 
       // Handle move-in after capture
       if (get().awaitingMoveIn && get().captureSource) {
         const srcArmies = get().territories[get().captureSource!]?.armies ?? 2;
         const moveCount = Math.max(1, Math.floor((srcArmies - 1) / 2));
         get().moveArmiesAfterCapture(moveCount);
+        await delay(120);
       }
 
       if (get().winner !== null) return;
     }
 
+    if (!stillMyTurn()) return;
+
     // End attack → fortify
     get().endPhase();
+    await delay(120);
+    if (!stillMyTurn()) return;
 
     // Fortify
-    const fortifyAction = aiFortify(s.currentPlayerIndex, get().territories);
+    const fortifyAction = aiFortify(playerIndex, get().territories);
     if (fortifyAction) {
       get().selectFortifySource(fortifyAction.source);
       get().selectFortifyTarget(fortifyAction.target);
+      await delay(120);
       get().executeFortify(fortifyAction.count);
-      get().endPhase();
-    } else {
-      get().endPhase(); // skip fortify
+      await delay(120);
     }
+    if (stillMyTurn()) get().endPhase();
   },
 }));

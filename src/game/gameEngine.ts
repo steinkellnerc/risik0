@@ -4,8 +4,9 @@
  * No side effects, no state mutations, no DB calls.
  */
 
-import { TerritoryState, RiskCard, CardType, getTradeInValue } from './types';
+import { TerritoryState, RiskCard, CardType, Mission, getTradeInValue } from './types';
 import { TERRITORIES, CONTINENTS, TERRITORY_MAP } from './mapData';
+import { checkMissionComplete } from './missions';
 
 // ==================== DICE ====================
 
@@ -208,4 +209,55 @@ export function isPlayerEliminated(
   territories: Record<string, TerritoryState>
 ): boolean {
   return !Object.values(territories).some(t => t.ownerId === playerIndex);
+}
+
+/**
+ * Scan every alive player for a satisfied win condition.
+ * Precedence:
+ *   1. World domination
+ *   2. destroy_player missions (one-time event — must not be missed if other missions also fire)
+ *   3. conquer_continents / conquer_territories missions, preferring the actor (just-acted player) on ties
+ * Returns the winning playerIndex, or null.
+ */
+export function evaluateWinner(
+  territories: Record<string, TerritoryState>,
+  eliminated: boolean[],
+  missions: Record<number, Mission>,
+  useMissions: boolean,
+  actorIndex: number,
+  playerCount: number = 6
+): number | null {
+  for (let p = 0; p < playerCount; p++) {
+    if (eliminated[p]) continue;
+    if (checkWorldDomination(p, territories)) return p;
+  }
+
+  if (!useMissions) return null;
+
+  // Destroy-player missions take priority — defender's elimination is a one-time event,
+  // and the destroyer (or whoever's mission it was) should win immediately, even if
+  // the attacker simultaneously satisfies a continent/territory mission.
+  for (let p = 0; p < playerCount; p++) {
+    if (eliminated[p]) continue;
+    const m = missions[p];
+    if (!m || m.type !== 'destroy_player') continue;
+    if (checkMissionComplete(p, m, territories, eliminated)) return p;
+  }
+
+  // Then continent/territory missions — prefer the actor on ties.
+  if (!eliminated[actorIndex]) {
+    const m = missions[actorIndex];
+    if (m && m.type !== 'destroy_player' && checkMissionComplete(actorIndex, m, territories, eliminated)) {
+      return actorIndex;
+    }
+  }
+  for (let p = 0; p < playerCount; p++) {
+    if (p === actorIndex) continue;
+    if (eliminated[p]) continue;
+    const m = missions[p];
+    if (!m || m.type === 'destroy_player') continue;
+    if (checkMissionComplete(p, m, territories, eliminated)) return p;
+  }
+
+  return null;
 }
