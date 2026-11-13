@@ -138,7 +138,7 @@ export default function MultiplayerGamePage() {
   // Connecting screen
   if (!connected || mySlotIndex === null) {
     return (
-      <div className="h-screen-safe bg-background flex flex-col items-center justify-center gap-5 px-4 p-safe">
+      <div className="min-h-screen-safe bg-background flex flex-col items-center justify-center gap-5 px-safe py-safe">
         <button
           type="button"
           onClick={() => navigate('/lobby')}
@@ -149,7 +149,7 @@ export default function MultiplayerGamePage() {
         <div className="w-10 h-10 rounded-full border-2 border-primary/20 border-t-primary animate-spin" />
         <div className="text-center space-y-1">
           <p className="text-sm text-foreground font-medium">Connecting to game…</p>
-          <p className="text-xs text-muted-foreground/60 font-mono">{gameId?.slice(0, 8)}</p>
+          <p className="text-xs text-muted-foreground font-mono">{gameId?.slice(0, 8)}</p>
         </div>
         {error && (
           <div className="text-destructive text-sm bg-destructive/10 rounded-lg px-4 py-3 text-center space-y-2">
@@ -176,7 +176,7 @@ export default function MultiplayerGamePage() {
       : [{ id: 'me', slotIndex: mySlotIndex ?? 0, displayName, color: '', userId: user?.id ?? null, isAi: false, armiesToPlace: 0, eliminated: false, secretObjective: null, cards: [] }];
 
     return (
-      <div className="h-screen-safe bg-background flex flex-col overflow-y-auto pt-safe pb-safe">
+      <div className="min-h-screen-safe bg-background flex flex-col pt-safe pb-safe">
         {/* Top bar */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
           <button

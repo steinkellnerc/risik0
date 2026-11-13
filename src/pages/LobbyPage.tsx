@@ -134,7 +134,7 @@ export default function LobbyPage() {
   );
 
   return (
-    <div className="h-screen-safe flex flex-col overflow-hidden pt-safe pb-safe relative bg-background">
+    <div className="min-h-screen-safe flex flex-col pt-safe pb-safe relative bg-background">
       {/* Gradient backdrop — subtle blue glow behind hero, fades to background */}
       <div
         aria-hidden
@@ -145,8 +145,8 @@ export default function LobbyPage() {
         }}
       />
 
-      {/* Fixed top — header + create game */}
-      <div className="flex-none px-4 pt-5 pb-4 relative z-10">
+      {/* Header and game setup */}
+      <div className="px-4 pt-5 pb-4 relative z-10">
         <div className="max-w-lg mx-auto space-y-4">
           <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
             {/* Header */}
@@ -154,7 +154,7 @@ export default function LobbyPage() {
               <div className="space-y-1.5">
                 <div className="flex items-center gap-2">
                   <h1 className="text-4xl font-bold text-foreground tracking-tight">RISK</h1>
-                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-primary/15 text-primary border border-primary/30">
+                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-primary/15 text-primary border border-primary/30">
                     <Sparkles size={10} /> Free for friends
                   </span>
                 </div>
@@ -190,8 +190,8 @@ export default function LobbyPage() {
         </div>
       </div>
 
-      {/* Scrollable games list */}
-      <div className="flex-1 overflow-y-auto relative z-10">
+      {/* Games list flows with the page so it remains reachable on short screens */}
+      <div className="relative z-10">
         <div className="max-w-lg mx-auto px-4 py-4 space-y-4">
 
           {/* My games */}
@@ -299,10 +299,10 @@ export default function LobbyPage() {
                 <p className="text-xs text-center">No completed games yet — be the first to claim victory!</p>
               </div>
             ) : (
-              <div className="overflow-hidden rounded-lg border border-border/60">
-                <table className="w-full font-mono-tabular">
+              <div className="overflow-x-auto touch-pan-x rounded-lg border border-border/60">
+                <table className="w-full min-w-[400px] font-mono-tabular">
                   <thead>
-                    <tr className="bg-muted/40 text-[10px] uppercase tracking-wider text-muted-foreground">
+                    <tr className="bg-muted/40 text-[11px] uppercase tracking-wider text-muted-foreground">
                       <th className="text-left font-semibold px-2 py-1.5 w-7">#</th>
                       <th className="text-left font-semibold px-2 py-1.5">Player</th>
                       <th className="text-right font-semibold px-2 py-1.5">Played</th>

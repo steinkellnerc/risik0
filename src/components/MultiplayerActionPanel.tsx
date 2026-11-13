@@ -46,7 +46,7 @@ function CardsPanel({
       </div>
 
       {cards.length === 0 ? (
-        <p className="text-xs text-muted-foreground/60">No cards yet — earn one by conquering a territory.</p>
+        <p className="text-xs text-muted-foreground">No cards yet — earn one by conquering a territory.</p>
       ) : (
         <>
           <div className="flex flex-wrap gap-1 mb-2">
@@ -106,7 +106,7 @@ function CardsPanel({
           )}
 
           {!canSelect && cards.length > 0 && (
-            <p className="text-xs text-muted-foreground/60">Trade available during Reinforce phase</p>
+            <p className="text-xs text-muted-foreground">Trade available during Reinforce phase</p>
           )}
         </>
       )}
@@ -383,7 +383,7 @@ export default function MultiplayerActionPanel() {
         <div className="space-y-0.5">
           {log.slice(0, 30).map((entry, i) => (
             <p key={i} className="text-xs text-foreground/70 leading-snug">
-              <span className="text-muted-foreground/60">
+              <span className="text-muted-foreground">
                 {new Date(entry.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               </span>
               {' '}{entry.message}
@@ -398,7 +398,7 @@ export default function MultiplayerActionPanel() {
     return (
       <DrawerPrimitive.Root open onOpenChange={() => {}} modal={false} snapPoints={[0.14, 0.72]} dismissible={false}>
         <DrawerPrimitive.Portal>
-          <DrawerPrimitive.Content className="fixed inset-x-0 bottom-0 z-40 flex flex-col bg-surface rounded-t-2xl border-t border-border pb-safe" style={{ maxHeight: '72vh' }}>
+          <DrawerPrimitive.Content className="fixed inset-x-0 bottom-0 z-40 flex flex-col bg-surface rounded-t-2xl border-t border-border pb-safe" style={{ maxHeight: '72dvh' }}>
             <div className="flex justify-center py-2 shrink-0">
               <div className="h-1.5 w-10 rounded-full bg-muted-foreground/30" />
             </div>

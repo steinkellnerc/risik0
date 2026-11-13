@@ -44,7 +44,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="h-screen-safe bg-background flex flex-col items-center justify-center px-4 p-safe">
+    <div className="min-h-screen-safe bg-background flex flex-col items-center justify-center px-safe py-safe">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -64,7 +64,7 @@ export default function LoginPage() {
               type="button"
               onClick={() => setMode('login')}
               aria-pressed={mode === 'login'}
-              className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-all ${
+              className={`flex-1 min-h-11 py-2 rounded-lg text-base font-semibold transition-all ${
                 mode === 'login'
                   ? 'bg-primary text-primary-foreground shadow-glow'
                   : 'bg-secondary text-muted-foreground hover:text-foreground'
@@ -76,7 +76,7 @@ export default function LoginPage() {
               type="button"
               onClick={() => setMode('register')}
               aria-pressed={mode === 'register'}
-              className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-all ${
+              className={`flex-1 min-h-11 py-2 rounded-lg text-base font-semibold transition-all ${
                 mode === 'register'
                   ? 'bg-primary text-primary-foreground shadow-glow'
                   : 'bg-secondary text-muted-foreground hover:text-foreground'
@@ -96,7 +96,7 @@ export default function LoginPage() {
                 onChange={e => setDisplayName(e.target.value)}
                 autoComplete="nickname"
                 required
-                className="w-full px-3 py-2 rounded-lg bg-muted text-foreground text-sm placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-2 focus:ring-primary"
+                className="w-full min-h-11 px-3 py-2 rounded-lg bg-muted text-foreground text-base placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-2 focus:ring-primary"
               />
             )}
             <input
@@ -106,7 +106,7 @@ export default function LoginPage() {
               value={email}
               onChange={e => setEmail(e.target.value)}
               autoComplete="email"
-              className="w-full px-3 py-2 rounded-lg bg-muted text-foreground text-sm placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-2 focus:ring-primary"
+              className="w-full min-h-11 px-3 py-2 rounded-lg bg-muted text-foreground text-base placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-2 focus:ring-primary"
               required
             />
             <div>
@@ -117,7 +117,7 @@ export default function LoginPage() {
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-                className="w-full px-3 py-2 rounded-lg bg-muted text-foreground text-sm placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-2 focus:ring-primary"
+                className="w-full min-h-11 px-3 py-2 rounded-lg bg-muted text-foreground text-base placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-2 focus:ring-primary"
                 required
                 minLength={6}
               />
@@ -128,7 +128,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full px-4 py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-50"
+            className="w-full min-h-11 px-4 py-2.5 bg-primary text-primary-foreground rounded-lg text-base font-semibold hover:opacity-90 transition-opacity disabled:opacity-50"
             >
               {loading ? 'Loading...' : mode === 'login' ? 'Sign In' : 'Create Account'}
             </button>

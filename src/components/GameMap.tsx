@@ -7,6 +7,7 @@ import { TERRITORIES, TERRITORY_MAP, CONTINENT_COLORS, CONTINENTS } from '../gam
 import { CLASSIC_COORDS } from '../game/classicCoords';
 import { getMapStyle, saveMapStyle } from '../lib/mapStyle';
 import { useIsMobile } from '../hooks/use-mobile';
+import { RotateCcw, ZoomIn, ZoomOut } from 'lucide-react';
 
 // Connection lines between adjacent territories
 function ConnectionLines() {
@@ -122,7 +123,7 @@ function CardTradingLegend() {
       <rect x="10" y="295" width="132" height="115" rx="4" fill="hsl(222, 40%, 8%)" stroke="hsl(210, 50%, 50%)" strokeWidth="1.2" opacity="0.95" />
 
       {/* Title */}
-      <text x="76" y="310" textAnchor="middle" fill="hsl(210, 80%, 70%)" fontSize="10" fontWeight="bold" fontFamily="IBM Plex Sans, sans-serif">
+      <text x="76" y="310" textAnchor="middle" fill="hsl(210, 80%, 78%)" fontSize="13" fontWeight="bold" fontFamily="IBM Plex Sans, sans-serif">
         Card Trading
       </text>
 
@@ -130,7 +131,7 @@ function CardTradingLegend() {
       <line x1="15" y1="315" x2="137" y2="315" stroke="hsl(210, 50%, 40%)" strokeWidth="0.6" />
 
       {/* Valid sets */}
-      <g fontSize="7.5" fontFamily="IBM Plex Mono, monospace">
+      <g fontSize="11" fontFamily="IBM Plex Mono, monospace">
         <text x="16" y="326" fill="hsl(210, 50%, 55%)">Valid sets:</text>
         <text x="16" y="337" fill="hsl(210, 70%, 65%)">  3 of same type</text>
         <text x="16" y="347" fill="hsl(210, 70%, 65%)">  1 of each type</text>
@@ -141,7 +142,7 @@ function CardTradingLegend() {
       <line x1="15" y1="362" x2="137" y2="362" stroke="hsl(210, 50%, 40%)" strokeWidth="0.6" />
 
       {/* Trade-in values */}
-      <g fontSize="7.5" fontFamily="IBM Plex Mono, monospace">
+      <g fontSize="11" fontFamily="IBM Plex Mono, monospace">
         <text x="16" y="373" fill="hsl(210, 50%, 55%)">Troops earned:</text>
         <text x="16" y="384" fill="hsl(48, 96%, 53%)">4, 6, 8, 10, 12, 15</text>
         <text x="16" y="394" fill="hsl(48, 96%, 53%)">then +5 each trade</text>
@@ -158,7 +159,7 @@ function ContinentBonusTable() {
       <rect x="10" y="415" width="132" height="95" rx="4" fill="hsl(222, 40%, 8%)" stroke="hsl(210, 50%, 50%)" strokeWidth="1.2" opacity="0.95" />
 
       {/* Title */}
-      <text x="76" y="430" textAnchor="middle" fill="hsl(210, 80%, 70%)" fontSize="10" fontWeight="bold" fontFamily="IBM Plex Sans, sans-serif">
+      <text x="76" y="430" textAnchor="middle" fill="hsl(210, 80%, 78%)" fontSize="13" fontWeight="bold" fontFamily="IBM Plex Sans, sans-serif">
         Continent Bonuses
       </text>
 
@@ -166,7 +167,7 @@ function ContinentBonusTable() {
       <line x1="15" y1="435" x2="137" y2="435" stroke="hsl(210, 50%, 40%)" strokeWidth="0.6" />
 
       {/* Continent rows */}
-      <g fontSize="7.5" fontFamily="IBM Plex Mono, monospace" fill="hsl(210, 70%, 65%)">
+      <g fontSize="11" fontFamily="IBM Plex Mono, monospace" fill="hsl(210, 70%, 75%)">
         <text x="16" y="449">North America</text>
         <text x="137" y="449" textAnchor="end" fill="hsl(48, 96%, 53%)">+5</text>
 
@@ -305,19 +306,52 @@ export default function GameMap({ multiplayer = false }: { multiplayer?: boolean
     return { x, y, scale: s };
   }, []);
 
+  const getMapPoint = useCallback((clientX: number, clientY: number) => {
+    const svg = svgRef.current;
+    const matrix = svg?.getScreenCTM();
+    if (!svg || !matrix) return null;
+    const point = svg.createSVGPoint();
+    point.x = clientX;
+    point.y = clientY;
+    const mapped = point.matrixTransform(matrix.inverse());
+    return { x: mapped.x, y: mapped.y };
+  }, []);
+
+  const zoomBy = (factor: number) => {
+    const svg = svgRef.current;
+    if (!svg) return;
+    const rect = svg.getBoundingClientRect();
+    const center = getMapPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
+    if (!center) return;
+    setTransform(t => {
+      const newScale = Math.max(0.6, Math.min(4, t.scale * factor));
+      const scaleFactor = newScale / t.scale;
+      return clampTransform(
+        center.x - scaleFactor * (center.x - t.x),
+        center.y - scaleFactor * (center.y - t.y),
+        newScale
+      );
+    });
+  };
+
+  const resetZoom = () => setTransform({ x: 0, y: 0, scale: 1 });
+
   // Wheel zoom (toward cursor)
   const handleWheel = useCallback((e: WheelEvent) => {
     e.preventDefault();
-    const rect = containerRef.current!.getBoundingClientRect();
-    const mx = e.clientX - rect.left;
-    const my = e.clientY - rect.top;
+    const point = getMapPoint(e.clientX, e.clientY);
+    if (!point) return;
     setTransform(t => {
       const factor = e.deltaY < 0 ? 1.12 : 0.88;
       const newScale = Math.max(0.6, Math.min(4, t.scale * factor));
       const sf = newScale / t.scale;
-      return clampTransform(mx - sf * (mx - t.x), my - sf * (my - t.y), newScale);
+      return clampTransform(
+        point.x - sf * (point.x - t.x),
+        point.y - sf * (point.y - t.y),
+        newScale
+      );
     });
-  }, [clampTransform]);
+  }, [clampTransform, getMapPoint]);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -364,16 +398,19 @@ export default function GameMap({ multiplayer = false }: { multiplayer?: boolean
         x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
         y: (e.touches[0].clientY + e.touches[1].clientY) / 2,
       };
-      const rect = containerRef.current!.getBoundingClientRect();
-      const mx = mid.x - rect.left;
-      const my = mid.y - rect.top;
+      const point = getMapPoint(mid.x, mid.y);
+      if (!point) return;
       const factor = dist / lastTouchDist.current;
       lastTouchDist.current = dist;
       lastTouchMid.current = mid;
       setTransform(t => {
         const newScale = Math.max(0.6, Math.min(4, t.scale * factor));
         const sf = newScale / t.scale;
-        return clampTransform(mx - sf * (mx - t.x), my - sf * (my - t.y), newScale);
+        return clampTransform(
+          point.x - sf * (point.x - t.x),
+          point.y - sf * (point.y - t.y),
+          newScale
+        );
       });
     } else if (e.touches.length === 1 && dragRef.current.dragging) {
       const dx = e.touches[0].clientX - dragRef.current.startX;
@@ -399,10 +436,54 @@ export default function GameMap({ multiplayer = false }: { multiplayer?: boolean
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
     >
-      <button type="button" onClick={toggleMapStyle} aria-label="Toggle map style"
-        className="absolute top-2 right-2 z-10 px-2 py-1 text-xs font-medium bg-black/50 text-white rounded-md hover:bg-black/70 transition-colors">
-        {classic ? 'Modern' : 'Classic'}
-      </button>
+      <div className="absolute top-2 right-2 z-10 flex items-center gap-1">
+        <button
+          type="button"
+          onMouseDown={e => e.stopPropagation()}
+          onTouchStart={e => e.stopPropagation()}
+          onClick={() => zoomBy(1.25)}
+          aria-label="Zoom in"
+          title="Zoom in"
+          className="flex h-10 w-10 items-center justify-center rounded-md bg-black/70 text-white hover:bg-black transition-colors"
+        >
+          <ZoomIn size={18} />
+        </button>
+        <button
+          type="button"
+          onMouseDown={e => e.stopPropagation()}
+          onTouchStart={e => e.stopPropagation()}
+          onClick={() => zoomBy(0.8)}
+          aria-label="Zoom out"
+          title="Zoom out"
+          className="flex h-10 w-10 items-center justify-center rounded-md bg-black/70 text-white hover:bg-black transition-colors"
+        >
+          <ZoomOut size={18} />
+        </button>
+        <button
+          type="button"
+          onMouseDown={e => e.stopPropagation()}
+          onTouchStart={e => e.stopPropagation()}
+          onClick={resetZoom}
+          aria-label="Reset map zoom"
+          title="Reset map zoom"
+          className="flex h-10 w-10 items-center justify-center rounded-md bg-black/70 text-white hover:bg-black transition-colors"
+        >
+          <RotateCcw size={16} />
+        </button>
+        <button
+          type="button"
+          onMouseDown={e => e.stopPropagation()}
+          onTouchStart={e => e.stopPropagation()}
+          onClick={toggleMapStyle}
+          aria-label="Toggle map style"
+          className="min-h-10 rounded-md bg-black/70 px-3 text-xs font-semibold text-white hover:bg-black transition-colors"
+        >
+          {classic ? 'Modern' : 'Classic'}
+        </button>
+      </div>
+      <div className="pointer-events-none absolute left-2 top-14 z-10 max-w-40 rounded-md bg-black/70 px-2 py-1 text-xs font-medium text-white">
+        Drag to pan · pinch or use controls to zoom
+      </div>
 
       {classic ? (
         /* ==================== CLASSIC MAP ==================== */
@@ -455,7 +536,7 @@ export default function GameMap({ multiplayer = false }: { multiplayer?: boolean
                     className={isSource || isTarget || isPotentialSource ? 'animate-pulse-territory' : ''}
                   />
                   <text x={cx} y={cy + 1} textAnchor="middle" dominantBaseline="middle"
-                    fill="white" fontSize="15" fontFamily="IBM Plex Mono, monospace" fontWeight="700">
+                    fill="white" fontSize="18" fontFamily="IBM Plex Mono, monospace" fontWeight="700">
                     {state.armies}
                   </text>
                 </g>
@@ -543,11 +624,11 @@ export default function GameMap({ multiplayer = false }: { multiplayer?: boolean
                     className={isSource || isTarget || isPotentialSource ? 'animate-pulse-territory' : ''}
                   />
                   <text x={t.cx} y={t.cy + 1} textAnchor="middle" dominantBaseline="middle"
-                    fill="white" fontSize="15" fontFamily="IBM Plex Mono, monospace" fontWeight="700">
+                    fill="white" fontSize="18" fontFamily="IBM Plex Mono, monospace" fontWeight="700">
                     {state.armies}
                   </text>
                   <text x={t.cx} y={t.cy + 28} textAnchor="middle" dominantBaseline="middle"
-                    fill="hsl(210, 20%, 65%)" fontSize="8.5" fontFamily="IBM Plex Sans, sans-serif" fontWeight="500">
+                    fill="hsl(210, 20%, 82%)" fontSize="12" fontFamily="IBM Plex Sans, sans-serif" fontWeight="500">
                     {t.name}
                   </text>
                 </g>

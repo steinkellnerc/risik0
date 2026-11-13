@@ -77,6 +77,7 @@ export default function MultiplayerStatusBar() {
                 transition={{ type: 'spring', stiffness: 260, damping: 22 }}
                 onClick={e => e.stopPropagation()}
                 className="relative w-full max-w-sm max-h-[88vh] overflow-y-auto bg-surface rounded-2xl p-5 space-y-4 shadow-elevated border border-border"
+                style={{ maxHeight: '88dvh' }}
               >
                 {/* Close */}
                 <button
@@ -99,7 +100,7 @@ export default function MultiplayerStatusBar() {
 
                 {/* Final standings */}
                 <div className="bg-muted/40 rounded-lg p-3 space-y-1.5">
-                  <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Final standings</span>
+                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Final standings</span>
                   {standings.map((p, idx) => {
                     const isWinner = p.slotIndex === resolvedWinnerSlot || p.userId === winnerId || p.id === winnerId;
                     return (
@@ -110,7 +111,7 @@ export default function MultiplayerStatusBar() {
                           {p.isAi ? 'AI ' : ''}{p.displayName}
                         </span>
                         <span className="text-foreground">{playerTerritories(p.slotIndex)}</span>
-                        <Square size={9} className="text-muted-foreground/60" />
+                        <Square size={11} className="text-muted-foreground" />
                         <span className="text-foreground">{playerArmies(p.slotIndex)}</span>
                       </div>
                     );
@@ -120,7 +121,7 @@ export default function MultiplayerStatusBar() {
                 {/* Missions */}
                 {useMissions && (
                   <div className="bg-muted/40 rounded-lg p-3 space-y-1.5">
-                    <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">All missions revealed</span>
+                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">All missions revealed</span>
                     {players.map(p => {
                       const isWinner = p.slotIndex === resolvedWinnerSlot || p.userId === winnerId || p.id === winnerId;
                       return (
@@ -228,7 +229,7 @@ export default function MultiplayerStatusBar() {
             {p.isAi ? 'AI ' : ''}{p.displayName.split(' ')[0]}
           </span>
           <span className="font-mono-tabular text-xs text-foreground">{playerTerritories(p.slotIndex)}</span>
-          <Square size={9} className="text-muted-foreground/60" />
+          <Square size={11} className="text-muted-foreground" />
           <span className="font-mono-tabular text-xs text-foreground">{playerArmies(p.slotIndex)}</span>
           <span className={`font-mono-tabular text-xs ${p.cards.length > 0 ? 'text-foreground' : 'text-muted-foreground'}`}>🃏{p.cards.length}</span>
         </div>
