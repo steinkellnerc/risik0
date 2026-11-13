@@ -8,7 +8,7 @@
 let aiTurnRunning = false;
 
 import { create } from 'zustand';
-import type { Phase, TerritoryState, RiskCard } from './types';
+import type { Mission, Phase, TerritoryState, RiskCard } from './types';
 import { PLAYER_NAMES } from './types';
 import { TERRITORIES, TERRITORY_MAP } from './mapData';
 import {
@@ -19,8 +19,10 @@ import {
   checkWorldDomination,
   isPlayerEliminated,
   getReachableTerritories,
+  isValidCardSet,
+  getTerritoryCardBonus,
 } from './gameEngine';
-import { checkMissionComplete, assignMissions, assignMissionsSeeded } from './missions';
+import { checkMissionComplete } from './missions';
 import { aiReinforce, aiDecideAttacks, aiFortify } from './ai';
 import {
   fetchGameState,
@@ -28,6 +30,10 @@ import {
   updateGame,
   updatePlayer,
   addGameLog,
+  grantCard,
+  returnCards,
+  getGameMissions,
+  getDestroyMissionWinner,
   subscribeToGame,
   unsubscribeFromGame,
 } from '../lib/multiplayerSync';
@@ -51,7 +57,9 @@ export interface MultiplayerGameState {
   tradeInCount: number;
   hasConqueredThisTurn: boolean;
   useMissions: boolean;
+  missions: Record<number, Mission>;
   winnerId: string | null;
+  winnerSlotIndex: number | null;
 
   // Players
   players: Array<{
@@ -121,7 +129,9 @@ export const useMultiplayerStore = create<MultiplayerGameState>((set, get) => ({
   tradeInCount: 0,
   hasConqueredThisTurn: false,
   useMissions: false,
+  missions: {},
   winnerId: null,
+  winnerSlotIndex: null,
 
   // Players & territories
   players: [],
@@ -168,9 +178,9 @@ export const useMultiplayerStore = create<MultiplayerGameState>((set, get) => ({
       };
     }
 
-    // Compute missions client-side (deterministic from gameId — avoids RLS issues with DB writes)
+    // Supabase only returns this user's mission (plus AI missions for the host).
     const useMissionsFlag = state.game.use_missions as boolean;
-    const missionMap = useMissionsFlag ? assignMissionsSeeded(gameId, 6) : {};
+    const missionMap = useMissionsFlag ? state.missions : {};
 
     // Convert players from DB format
     const players = (state.players as Array<Record<string, unknown>>).map(p => ({
@@ -215,7 +225,9 @@ export const useMultiplayerStore = create<MultiplayerGameState>((set, get) => ({
       tradeInCount: state.game.trade_in_count as number,
       hasConqueredThisTurn: state.game.has_conquered_this_turn as boolean,
       useMissions: state.game.use_missions as boolean,
+      missions: missionMap,
       winnerId: state.game.winner_id as string | null,
+      winnerSlotIndex: (state.game.winner_slot_index as number | null) ?? null,
       players,
       territories,
       reinforcementsLeft,
@@ -250,6 +262,7 @@ export const useMultiplayerStore = create<MultiplayerGameState>((set, get) => ({
           tradeInCount: game.trade_in_count as number,
           hasConqueredThisTurn: game.has_conquered_this_turn as boolean,
           winnerId: game.winner_id as string | null,
+          winnerSlotIndex: (game.winner_slot_index as number | null) ?? null,
           isMyTurn: newIsMyTurn,
           // Always sync reinforcementsLeft on turn change so next player isn't stuck at 0
           ...(turnChanged ? {
@@ -265,6 +278,22 @@ export const useMultiplayerStore = create<MultiplayerGameState>((set, get) => ({
           } : {}),
         });
 
+        const shouldRefreshMissions = s.gameId && s.useMissions && (
+          (game.status === 'ACTIVE' && s.status === 'LOBBY') ||
+          (game.status === 'COMPLETED' && Object.keys(s.missions).length < s.players.length)
+        );
+        if (shouldRefreshMissions) {
+          void getGameMissions(s.gameId).then(missions => {
+            const players = get().players.map(player => ({
+              ...player,
+              secretObjective: missions[player.slotIndex]?.description ?? null,
+            }));
+            set({ missions, players });
+          }).catch(error => {
+            console.error('Failed to synchronize private game missions:', error);
+          });
+        }
+
         // Trigger AI turn if needed
         const currentP = s.players.find(p => p.slotIndex === newCurrentPlayer);
         if (currentP?.isAi && game.status === 'ACTIVE' && game.turn_phase === 'REINFORCE') {
@@ -274,7 +303,6 @@ export const useMultiplayerStore = create<MultiplayerGameState>((set, get) => ({
       onPlayerUpdate: (dbPlayer) => {
         const s = get();
         const slotIndex = dbPlayer.slot_index as number;
-        const missionMap = s.useMissions && s.gameId ? assignMissionsSeeded(s.gameId, 6) : {};
 
         const updatedPlayer = {
           id: dbPlayer.id as string,
@@ -285,7 +313,7 @@ export const useMultiplayerStore = create<MultiplayerGameState>((set, get) => ({
           isAi: dbPlayer.is_ai as boolean,
           armiesToPlace: dbPlayer.armies_to_place as number,
           eliminated: dbPlayer.eliminated as boolean,
-          secretObjective: s.useMissions ? (missionMap[slotIndex]?.description ?? null) : null,
+          secretObjective: s.useMissions ? (s.missions[slotIndex]?.description ?? null) : null,
           cards: (dbPlayer.cards as RiskCard[] || []) as RiskCard[],
         };
 
@@ -340,6 +368,7 @@ export const useMultiplayerStore = create<MultiplayerGameState>((set, get) => ({
       connected: false,
       myUserId: null,
       mySlotIndex: null,
+      missions: {},
     });
   },
 
@@ -377,7 +406,8 @@ export const useMultiplayerStore = create<MultiplayerGameState>((set, get) => ({
   // ==================== ATTACK SELECTION ====================
   selectAttackSource: (territoryId: string) => {
     const s = get();
-    if (s.phase !== 'ATTACK') return;
+    if (s.phase !== 'ATTACK' || s.awaitingMoveIn) return;
+    if (!s.isMyTurn && !s.players.find(p => p.slotIndex === s.currentPlayerIndex)?.isAi) return;
     if (s.territories[territoryId]?.ownerId !== s.currentPlayerIndex) return;
     if (s.territories[territoryId].armies < 2) return;
     set({ attackSource: territoryId, attackTarget: null, lastDiceRoll: null });
@@ -385,7 +415,8 @@ export const useMultiplayerStore = create<MultiplayerGameState>((set, get) => ({
 
   selectAttackTarget: (territoryId: string) => {
     const s = get();
-    if (!s.attackSource) return;
+    if (s.phase !== 'ATTACK' || s.awaitingMoveIn || !s.attackSource) return;
+    if (!s.isMyTurn && !s.players.find(p => p.slotIndex === s.currentPlayerIndex)?.isAi) return;
     if (!areAdjacent(s.attackSource, territoryId)) return;
     if (s.territories[territoryId]?.ownerId === s.currentPlayerIndex) return;
     set({ attackTarget: territoryId });
@@ -394,11 +425,16 @@ export const useMultiplayerStore = create<MultiplayerGameState>((set, get) => ({
   // ==================== EXECUTE ATTACK ====================
   executeAttack: async (attackDice: number, defendDice: number) => {
     const s = get();
-    if (!s.gameId || !s.attackSource || !s.attackTarget) return;
+    if (!s.gameId || s.phase !== 'ATTACK' || s.awaitingMoveIn || !s.attackSource || !s.attackTarget) return;
     if (!s.isMyTurn && !s.players.find(p => p.slotIndex === s.currentPlayerIndex)?.isAi) return;
 
     const source = s.territories[s.attackSource];
     const target = s.territories[s.attackTarget];
+    if (
+      !source || !target || source.ownerId !== s.currentPlayerIndex ||
+      target.ownerId === s.currentPlayerIndex || source.armies < 2 ||
+      !areAdjacent(s.attackSource, s.attackTarget)
+    ) return;
 
     const result = resolveCombat(
       source.armies, target.armies,
@@ -419,19 +455,34 @@ export const useMultiplayerStore = create<MultiplayerGameState>((set, get) => ({
 
     // Check for elimination
     let winnerId: string | null = s.winnerId;
+    let winnerSlotIndex: number | null = s.winnerSlotIndex;
     const defenderId = target.ownerId;
+    let defenderEliminated = false;
+    const playersAfterAttack = s.players.map(player => ({ ...player, cards: [...player.cards] }));
+    const playerWrites: Promise<void>[] = [];
 
     if (result.captured) {
-      const defenderEliminated = isPlayerEliminated(defenderId, newTerritories);
+      defenderEliminated = isPlayerEliminated(defenderId, newTerritories);
       if (defenderEliminated) {
-        await updatePlayer(s.gameId, defenderId, { eliminated: true });
-        await addGameLog(s.gameId, s.currentPlayerIndex,
-          `${s.players.find(p => p.slotIndex === defenderId)?.displayName || PLAYER_NAMES[defenderId]} eliminated!`, 'elimination');
+        const defender = playersAfterAttack.find(p => p.slotIndex === defenderId);
+        const attacker = playersAfterAttack.find(p => p.slotIndex === s.currentPlayerIndex);
+        const capturedCards = defender?.cards ?? [];
+        if (defender) {
+          defender.eliminated = true;
+          defender.cards = [];
+          playerWrites.push(updatePlayer(s.gameId, defenderId, { eliminated: true, cards: [] }));
+        }
+        if (attacker && capturedCards.length > 0) {
+          attacker.cards = [...attacker.cards, ...capturedCards];
+          playerWrites.push(updatePlayer(s.gameId, s.currentPlayerIndex, { cards: attacker.cards }));
+        }
+        playerWrites.push(addGameLog(s.gameId, s.currentPlayerIndex,
+          `${defender?.displayName || PLAYER_NAMES[defenderId]} eliminated!`, 'elimination'));
       }
 
-      // Build eliminated array indexed by slotIndex for mission checks
+      // Build eliminated array indexed by slotIndex for the active player's mission.
       const eliminatedAfter = Array(6).fill(false) as boolean[];
-      for (const p of s.players) {
+      for (const p of playersAfterAttack) {
         eliminatedAfter[p.slotIndex] = p.slotIndex === defenderId
           ? (defenderEliminated || p.eliminated)
           : p.eliminated;
@@ -439,29 +490,18 @@ export const useMultiplayerStore = create<MultiplayerGameState>((set, get) => ({
 
       // Check win: world domination
       if (checkWorldDomination(s.currentPlayerIndex, newTerritories)) {
-        const winnerPlayer = s.players.find(p => p.slotIndex === s.currentPlayerIndex);
-        winnerId = winnerPlayer ? (winnerPlayer.userId ?? winnerPlayer.id) : null;
+        const winnerPlayer = playersAfterAttack.find(p => p.slotIndex === s.currentPlayerIndex);
+        winnerSlotIndex = s.currentPlayerIndex;
+        winnerId = winnerPlayer?.userId ?? null;
       }
 
       // Check win: missions
-      if (!winnerId && s.useMissions && s.gameId) {
-        const missionMap = assignMissionsSeeded(s.gameId, s.players.length);
-        // Check attacker's mission (conquer/destroy)
-        const attackerMission = missionMap[s.currentPlayerIndex];
+      if (winnerSlotIndex === null && s.useMissions && s.gameId) {
+        const attackerMission = s.missions[s.currentPlayerIndex];
         if (attackerMission && checkMissionComplete(s.currentPlayerIndex, attackerMission, newTerritories, eliminatedAfter)) {
-          const winnerPlayer = s.players.find(p => p.slotIndex === s.currentPlayerIndex);
-          winnerId = winnerPlayer ? (winnerPlayer.userId ?? winnerPlayer.id) : null;
-        }
-        // If defender was eliminated, check all players with destroy_player missions targeting them
-        if (!winnerId && defenderEliminated) {
-          for (const p of s.players) {
-            if (p.slotIndex === s.currentPlayerIndex) continue;
-            const m = missionMap[p.slotIndex];
-            if (m && checkMissionComplete(p.slotIndex, m, newTerritories, eliminatedAfter)) {
-              winnerId = p.userId ?? p.id;
-              break;
-            }
-          }
+          const winnerPlayer = playersAfterAttack.find(p => p.slotIndex === s.currentPlayerIndex);
+          winnerSlotIndex = s.currentPlayerIndex;
+          winnerId = winnerPlayer?.userId ?? null;
         }
       }
     }
@@ -471,10 +511,14 @@ export const useMultiplayerStore = create<MultiplayerGameState>((set, get) => ({
       territories: newTerritories,
       lastDiceRoll: { attacker: result.attackerRolls, defender: result.defenderRolls },
       hasConqueredThisTurn: s.hasConqueredThisTurn || result.captured,
+      players: playersAfterAttack,
+      winnerId,
+      winnerSlotIndex,
+      ...(winnerSlotIndex !== null ? { status: 'COMPLETED' } : {}),
       capturedTerritory: result.captured ? targetName : null,
       captureSource: result.captured ? s.attackSource : null,
       awaitingMoveIn: result.captured,
-      minMoveIn: result.captured ? attackDice : 1,
+      minMoveIn: result.captured ? result.attackerRolls.length : 1,
       attackSource: result.captured ? null : s.attackSource,
       attackTarget: result.captured ? null : s.attackTarget,
     });
@@ -488,10 +532,23 @@ export const useMultiplayerStore = create<MultiplayerGameState>((set, get) => ({
       }),
       updateGame(s.gameId, { has_conquered_this_turn: s.hasConqueredThisTurn || result.captured }),
       addGameLog(s.gameId, s.currentPlayerIndex, logMsg, 'attack'),
+      ...playerWrites,
     ]);
 
-    if (winnerId) {
-      await updateGame(s.gameId, { status: 'COMPLETED', winner_id: winnerId });
+    if (winnerSlotIndex === null && defenderEliminated && s.useMissions) {
+      winnerSlotIndex = await getDestroyMissionWinner(s.gameId, defenderId);
+      if (winnerSlotIndex !== null) {
+        winnerId = playersAfterAttack.find(p => p.slotIndex === winnerSlotIndex)?.userId ?? null;
+        set({ winnerId, winnerSlotIndex, status: 'COMPLETED' });
+      }
+    }
+
+    if (winnerSlotIndex !== null) {
+      await updateGame(s.gameId, {
+        status: 'COMPLETED',
+        winner_id: winnerId,
+        winner_slot_index: winnerSlotIndex,
+      });
     }
   },
 
@@ -499,6 +556,7 @@ export const useMultiplayerStore = create<MultiplayerGameState>((set, get) => ({
   moveArmiesAfterCapture: async (count: number) => {
     const s = get();
     if (!s.gameId || !s.capturedTerritory || !s.awaitingMoveIn || !s.captureSource) return;
+    if (!s.isMyTurn && !s.players.find(p => p.slotIndex === s.currentPlayerIndex)?.isAi) return;
 
     const captured = s.capturedTerritory;
     const sourceId = s.captureSource;
@@ -531,6 +589,7 @@ export const useMultiplayerStore = create<MultiplayerGameState>((set, get) => ({
   selectFortifySource: (territoryId: string) => {
     const s = get();
     if (s.phase !== 'FORTIFY') return;
+    if (!s.isMyTurn && !s.players.find(p => p.slotIndex === s.currentPlayerIndex)?.isAi) return;
     if (s.territories[territoryId]?.ownerId !== s.currentPlayerIndex) return;
     if (s.territories[territoryId].armies < 2) return;
     set({ fortifySource: territoryId, fortifyTarget: null });
@@ -539,6 +598,7 @@ export const useMultiplayerStore = create<MultiplayerGameState>((set, get) => ({
   selectFortifyTarget: (territoryId: string) => {
     const s = get();
     if (!s.fortifySource || territoryId === s.fortifySource) return;
+    if (s.phase !== 'FORTIFY' || (!s.isMyTurn && !s.players.find(p => p.slotIndex === s.currentPlayerIndex)?.isAi)) return;
     if (s.territories[territoryId]?.ownerId !== s.currentPlayerIndex) return;
     const reachable = getReachableTerritories(s.fortifySource, s.territories, s.currentPlayerIndex);
     if (!reachable.has(territoryId)) return;
@@ -548,9 +608,16 @@ export const useMultiplayerStore = create<MultiplayerGameState>((set, get) => ({
   // ==================== EXECUTE FORTIFY ====================
   executeFortify: async (count: number) => {
     const s = get();
-    if (!s.gameId || !s.fortifySource || !s.fortifyTarget) return;
+    if (!s.gameId || s.phase !== 'FORTIFY' || !s.fortifySource || !s.fortifyTarget) return;
+    if (!s.isMyTurn && !s.players.find(p => p.slotIndex === s.currentPlayerIndex)?.isAi) return;
 
     const source = s.territories[s.fortifySource];
+    const target = s.territories[s.fortifyTarget];
+    if (
+      !source || !target || source.ownerId !== s.currentPlayerIndex ||
+      target.ownerId !== s.currentPlayerIndex ||
+      !getReachableTerritories(s.fortifySource, s.territories, s.currentPlayerIndex).has(s.fortifyTarget)
+    ) return;
     count = Math.min(count, source.armies - 1);
     if (count < 1) return;
 
@@ -581,13 +648,16 @@ export const useMultiplayerStore = create<MultiplayerGameState>((set, get) => ({
   tradeInCards: async (cardIds: string[]) => {
     const s = get();
     if (!s.gameId || s.phase !== 'REINFORCE' || s.mySlotIndex === null) return;
+    if (s.mySlotIndex !== s.currentPlayerIndex || !s.isMyTurn) return;
+    if (cardIds.length !== 3 || new Set(cardIds).size !== 3) return;
     const myPlayer = s.players.find(p => p.slotIndex === s.mySlotIndex);
     if (!myPlayer) return;
 
     const selectedCards = cardIds.map(id => myPlayer.cards.find(c => c.id === id)).filter(Boolean) as RiskCard[];
-    if (selectedCards.length !== 3) return;
+    if (selectedCards.length !== 3 || !isValidCardSet(selectedCards)) return;
 
-    const bonus = getTradeInValue(s.tradeInCount);
+    const bonus = getTradeInValue(s.tradeInCount) +
+      getTerritoryCardBonus(selectedCards, s.mySlotIndex, s.territories);
     const remainingCards = myPlayer.cards.filter(c => !cardIds.includes(c.id));
     const newArmies = s.reinforcementsLeft + bonus;
 
@@ -597,35 +667,38 @@ export const useMultiplayerStore = create<MultiplayerGameState>((set, get) => ({
     );
     set({ players: updatedPlayers, reinforcementsLeft: newArmies, tradeInCount: s.tradeInCount + 1 });
 
-    // Write to DB
-    await updatePlayer(s.gameId, s.mySlotIndex, {
-      cards: remainingCards,
-      armies_to_place: newArmies,
-    });
-    await updateGame(s.gameId, { trade_in_count: s.tradeInCount + 1 });
-    await addGameLog(s.gameId, s.mySlotIndex, `Traded cards for ${bonus} armies`, 'info');
+    await Promise.all([
+      updatePlayer(s.gameId, s.mySlotIndex, {
+        cards: remainingCards,
+        armies_to_place: newArmies,
+      }),
+      updateGame(s.gameId, { trade_in_count: s.tradeInCount + 1 }),
+      returnCards(cardIds),
+      addGameLog(s.gameId, s.mySlotIndex, `Traded cards for ${bonus} armies`, 'info'),
+    ]);
   },
 
   // ==================== END PHASE ====================
   endPhase: async () => {
     const s = get();
     if (!s.gameId) return;
+    if (!s.isMyTurn && !s.players.find(p => p.slotIndex === s.currentPlayerIndex)?.isAi) return;
 
     if (s.phase === 'REINFORCE' && s.reinforcementsLeft > 0) return;
 
     if (s.phase === 'REINFORCE') {
       // Check mission completion after all reinforcements are placed
       if (s.useMissions && s.gameId) {
-        const missionMap = assignMissionsSeeded(s.gameId, s.players.length);
-        const mission = missionMap[s.currentPlayerIndex];
+        const mission = s.missions[s.currentPlayerIndex];
         const eliminated = Array(6).fill(false) as boolean[];
         for (const p of s.players) eliminated[p.slotIndex] = p.eliminated;
         if (mission && checkMissionComplete(s.currentPlayerIndex, mission, s.territories, eliminated)) {
           const winnerPlayer = s.players.find(p => p.slotIndex === s.currentPlayerIndex);
-          const wId = winnerPlayer ? (winnerPlayer.userId ?? winnerPlayer.id) : null;
-          if (wId) {
-            set({ winnerId: wId });
-            await updateGame(s.gameId, { winner_id: wId, status: 'COMPLETED' });
+          const winnerSlotIndex = s.currentPlayerIndex;
+          const winnerId = winnerPlayer?.userId ?? null;
+          if (winnerPlayer) {
+            set({ winnerId, winnerSlotIndex, status: 'COMPLETED' });
+            await updateGame(s.gameId, { winner_id: winnerId, winner_slot_index: winnerSlotIndex, status: 'COMPLETED' });
             await addGameLog(s.gameId, s.currentPlayerIndex, `${winnerPlayer?.displayName} wins by completing their mission!`, 'win');
             return;
           }
@@ -644,35 +717,35 @@ export const useMultiplayerStore = create<MultiplayerGameState>((set, get) => ({
         addGameLog(s.gameId, s.currentPlayerIndex, 'Fortify phase', 'info'),
       ];
       if (s.hasConqueredThisTurn && currentPlayer) {
-        const CARD_TYPES: RiskCard['type'][] = ['Infantry', 'Cavalry', 'Artillery'];
-        const type = CARD_TYPES[Math.floor(Math.random() * CARD_TYPES.length)];
-        const newCard: RiskCard = { id: crypto.randomUUID(), type, territoryId: '' };
-        const updatedPlayers = s.players.map(p =>
-          p.slotIndex === s.currentPlayerIndex ? { ...p, cards: [...p.cards, newCard] } : p
-        );
-        set({ players: updatedPlayers });
-        phaseWrites.push(
-          updatePlayer(s.gameId, s.currentPlayerIndex, {
-            cards: updatedPlayers.find(p => p.slotIndex === s.currentPlayerIndex)!.cards,
-          }),
-          addGameLog(s.gameId, s.currentPlayerIndex, 'Earned a Risk card', 'info'),
-        );
+        const card = await grantCard(s.gameId, s.currentPlayerIndex);
+        if (card) {
+          const updatedPlayers = s.players.map(p =>
+            p.slotIndex === s.currentPlayerIndex ? { ...p, cards: [...p.cards, card] } : p
+          );
+          set({ players: updatedPlayers });
+          phaseWrites.push(
+            updatePlayer(s.gameId, s.currentPlayerIndex, {
+              cards: updatedPlayers.find(p => p.slotIndex === s.currentPlayerIndex)!.cards,
+            }),
+            addGameLog(s.gameId, s.currentPlayerIndex, 'Earned a Risk card', 'info'),
+          );
+        }
       }
       await Promise.all(phaseWrites);
       set({ phase: 'FORTIFY', fortifySource: null, fortifyTarget: null, attackSource: null, attackTarget: null });
     } else if (s.phase === 'FORTIFY') {
       // Check mission completion after fortify (e.g. 18 territories with 2 armies each)
       if (s.useMissions && s.gameId) {
-        const missionMap = assignMissionsSeeded(s.gameId, s.players.length);
-        const mission = missionMap[s.currentPlayerIndex];
+        const mission = s.missions[s.currentPlayerIndex];
         const eliminated = Array(6).fill(false) as boolean[];
         for (const p of s.players) eliminated[p.slotIndex] = p.eliminated;
         if (mission && checkMissionComplete(s.currentPlayerIndex, mission, s.territories, eliminated)) {
           const winnerPlayer = s.players.find(p => p.slotIndex === s.currentPlayerIndex);
-          const wId = winnerPlayer ? (winnerPlayer.userId ?? winnerPlayer.id) : null;
-          if (wId) {
-            set({ winnerId: wId });
-            await updateGame(s.gameId, { winner_id: wId, status: 'COMPLETED' });
+          const winnerSlotIndex = s.currentPlayerIndex;
+          const winnerId = winnerPlayer?.userId ?? null;
+          if (winnerPlayer) {
+            set({ winnerId, winnerSlotIndex, status: 'COMPLETED' });
+            await updateGame(s.gameId, { winner_id: winnerId, winner_slot_index: winnerSlotIndex, status: 'COMPLETED' });
             await addGameLog(s.gameId, s.currentPlayerIndex, `${winnerPlayer?.displayName} wins by completing their mission!`, 'win');
             return;
           }
@@ -735,7 +808,8 @@ export const useMultiplayerStore = create<MultiplayerGameState>((set, get) => ({
         while (aiPlayer.cards.length >= 5 || (!tradedOnce && aiPlayer.cards.length >= 3)) {
           const validSet = aiValidCardSet(aiPlayer.cards);
           if (!validSet) break;
-          const bonus = getTradeInValue(get().tradeInCount);
+          const bonus = getTradeInValue(get().tradeInCount) +
+            getTerritoryCardBonus(validSet, s.currentPlayerIndex, get().territories);
           const remaining = aiPlayer.cards.filter(c => !validSet.some(v => v.id === c.id));
           const newArmies = get().reinforcementsLeft + bonus;
           const newTradeIn = get().tradeInCount + 1;
@@ -746,9 +820,12 @@ export const useMultiplayerStore = create<MultiplayerGameState>((set, get) => ({
             reinforcementsLeft: newArmies,
             tradeInCount: newTradeIn,
           });
-          await updatePlayer(s.gameId!, s.currentPlayerIndex, { cards: remaining, armies_to_place: newArmies });
-          await updateGame(s.gameId!, { trade_in_count: newTradeIn });
-          await addGameLog(s.gameId!, s.currentPlayerIndex, `AI traded cards for ${bonus} armies`, 'info');
+          await Promise.all([
+            updatePlayer(s.gameId!, s.currentPlayerIndex, { cards: remaining, armies_to_place: newArmies }),
+            updateGame(s.gameId!, { trade_in_count: newTradeIn }),
+            returnCards(validSet.map(card => card.id)),
+            addGameLog(s.gameId!, s.currentPlayerIndex, `AI traded cards for ${bonus} armies`, 'info'),
+          ]);
           await delay(80);
           aiPlayer = get().players.find(p => p.slotIndex === s.currentPlayerIndex)!;
           tradedOnce = true;
@@ -780,12 +857,13 @@ export const useMultiplayerStore = create<MultiplayerGameState>((set, get) => ({
       if (get().phase === 'REINFORCE') {
         await get().endPhase();
       }
+      if (get().winnerSlotIndex !== null) return;
       await delay(150);
 
       // Attack — recalculate after each conquest to chain opportunities
-      const aiMission = s.useMissions && s.gameId ? assignMissionsSeeded(s.gameId, s.players.length)[s.currentPlayerIndex] : undefined;
+      const aiMission = s.useMissions ? s.missions[s.currentPlayerIndex] : undefined;
       let attackRounds = 0;
-      while (attackRounds < 15 && get().winnerId === null) {
+      while (attackRounds < 15 && get().winnerSlotIndex === null) {
         const attacks = aiDecideAttacks(s.currentPlayerIndex, get().territories, aiMission);
         if (attacks.length === 0) break;
         let madeAttack = false;
@@ -817,12 +895,14 @@ export const useMultiplayerStore = create<MultiplayerGameState>((set, get) => ({
             }
           }
 
-          if (get().winnerId !== null) return;
+          if (get().winnerSlotIndex !== null) return;
         }
 
         if (!madeAttack) break;
         attackRounds++;
       }
+
+      if (get().winnerSlotIndex !== null) return;
 
       // End attack → fortify
       await get().endPhase();

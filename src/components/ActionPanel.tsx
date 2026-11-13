@@ -365,7 +365,7 @@ export default function ActionPanel() {
 
   if (isMobile) {
     return (
-      <DrawerPrimitive.Root open onOpenChange={() => {}} modal={false} snapPoints={[0.14, 0.72]} defaultSnap={0.14} dismissible={false}>
+      <DrawerPrimitive.Root open onOpenChange={() => {}} modal={false} snapPoints={[0.14, 0.72]} dismissible={false}>
         <DrawerPrimitive.Portal>
           <DrawerPrimitive.Content className="fixed inset-x-0 bottom-0 z-40 flex flex-col bg-surface rounded-t-2xl border-t border-border pb-safe" style={{ maxHeight: '72vh' }}>
             <div className="flex justify-center py-2 shrink-0">

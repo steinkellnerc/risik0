@@ -6,7 +6,7 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[];
 
-export interface Database {
+export type Database = {
   public: {
     Tables: {
       games: {
@@ -22,6 +22,7 @@ export interface Database {
           use_missions: boolean;
           host_user_id: string | null;
           winner_id: string | null;
+          winner_slot_index: number | null;
           last_move_at: string;
         };
         Insert: {
@@ -36,6 +37,7 @@ export interface Database {
           use_missions?: boolean;
           host_user_id?: string | null;
           winner_id?: string | null;
+          winner_slot_index?: number | null;
           last_move_at?: string;
         };
         Update: {
@@ -50,8 +52,10 @@ export interface Database {
           use_missions?: boolean;
           host_user_id?: string | null;
           winner_id?: string | null;
+          winner_slot_index?: number | null;
           last_move_at?: string;
         };
+        Relationships: [];
       };
       players: {
         Row: {
@@ -63,7 +67,6 @@ export interface Database {
           color: string;
           armies_to_place: number;
           is_ai: boolean;
-          secret_objective: string | null;
           eliminated: boolean;
           cards: Json;
         };
@@ -76,7 +79,6 @@ export interface Database {
           color: string;
           armies_to_place?: number;
           is_ai?: boolean;
-          secret_objective?: string | null;
           eliminated?: boolean;
           cards?: Json;
         };
@@ -89,10 +91,34 @@ export interface Database {
           color?: string;
           armies_to_place?: number;
           is_ai?: boolean;
-          secret_objective?: string | null;
           eliminated?: boolean;
           cards?: Json;
         };
+        Relationships: [{
+          foreignKeyName: "players_game_id_fkey";
+          columns: ["game_id"];
+          isOneToOne: false;
+          referencedRelation: "games";
+          referencedColumns: ["id"];
+        }];
+      };
+      game_missions: {
+        Row: {
+          game_id: string;
+          slot_index: number;
+          mission: Json;
+        };
+        Insert: {
+          game_id: string;
+          slot_index: number;
+          mission: Json;
+        };
+        Update: {
+          game_id?: string;
+          slot_index?: number;
+          mission?: Json;
+        };
+        Relationships: [];
       };
       territories: {
         Row: {
@@ -116,6 +142,7 @@ export interface Database {
           owner_slot_index?: number;
           army_count?: number;
         };
+        Relationships: [];
       };
       risk_cards: {
         Row: {
@@ -139,6 +166,7 @@ export interface Database {
           territory_name?: string | null;
           card_type?: string;
         };
+        Relationships: [];
       };
       game_log: {
         Row: {
@@ -165,10 +193,24 @@ export interface Database {
           message?: string;
           action_type?: string;
         };
+        Relationships: [];
       };
     };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      deal_game_missions: {
+        Args: { p_game_id: string };
+        Returns: undefined;
+      };
+      get_game_missions: {
+        Args: { p_game_id: string };
+        Returns: { slot_index: number; mission: Json }[];
+      };
+      get_destroy_mission_winner: {
+        Args: { p_game_id: string; p_target_slot: number };
+        Returns: number;
+      };
+    };
     Enums: Record<string, never>;
   };
 }

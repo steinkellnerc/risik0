@@ -119,7 +119,7 @@ export default function MultiplayerActionPanel() {
     phase, currentPlayerIndex, reinforcementsLeft, attackSource, attackTarget,
     fortifySource, fortifyTarget, lastDiceRoll, territories, players, awaitingMoveIn,
     capturedTerritory, captureSource: captureSourceId, minMoveIn, endPhase, executeAttack, executeFortify, moveArmiesAfterCapture,
-    tradeInCards, log, isMyTurn, mySlotIndex, myUserId, hostUserId, kickAI, winnerId,
+    tradeInCards, log, isMyTurn, mySlotIndex, myUserId, hostUserId, kickAI, winnerId, winnerSlotIndex,
   } = useMultiplayerStore();
 
   const [moveCount, setMoveCount] = useState(1);
@@ -150,7 +150,7 @@ export default function MultiplayerActionPanel() {
   const maxMoveIn = captureSourceState ? captureSourceState.armies - 1 : 1;
 
   // Game over — hide action panel so the map is fully visible for review
-  if (winnerId) return null;
+  if (winnerId || winnerSlotIndex !== null) return null;
 
   // Secret mission for current user
   const myMission = myPlayer?.secretObjective;
@@ -396,7 +396,7 @@ export default function MultiplayerActionPanel() {
 
   if (isMobile) {
     return (
-      <DrawerPrimitive.Root open onOpenChange={() => {}} modal={false} snapPoints={[0.14, 0.72]} defaultSnap={0.14} dismissible={false}>
+      <DrawerPrimitive.Root open onOpenChange={() => {}} modal={false} snapPoints={[0.14, 0.72]} dismissible={false}>
         <DrawerPrimitive.Portal>
           <DrawerPrimitive.Content className="fixed inset-x-0 bottom-0 z-40 flex flex-col bg-surface rounded-t-2xl border-t border-border pb-safe" style={{ maxHeight: '72vh' }}>
             <div className="flex justify-center py-2 shrink-0">

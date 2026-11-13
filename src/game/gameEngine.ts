@@ -73,6 +73,17 @@ export function isValidCardSet(cards: RiskCard[]): boolean {
   return false;
 }
 
+export function getTerritoryCardBonus(
+  cards: RiskCard[],
+  playerIndex: number,
+  territories: Record<string, TerritoryState>
+): number {
+  return cards.reduce(
+    (bonus, card) => bonus + (card.territoryId && territories[card.territoryId]?.ownerId === playerIndex ? 2 : 0),
+    0
+  );
+}
+
 export { getTradeInValue };
 
 // ==================== COMBAT ====================
@@ -136,9 +147,9 @@ export function distributeTerritories(playerCount: number): Record<string, Terri
     territories[tid] = { ownerId: i % playerCount, armies: 1 };
   });
 
-  // Distribute remaining armies (14 per player = 7 territories + 7 extra)
+  // The six-player setup starts each player with 20 armies.
   for (let p = 0; p < playerCount; p++) {
-    let remaining = 13; // 14 total - 1 already placed per territory = varies, but classic is 14 per player
+    let remaining = 13;
     const owned = shuffled.filter((_, i) => i % playerCount === p);
     while (remaining > 0) {
       const tid = owned[Math.floor(Math.random() * owned.length)];

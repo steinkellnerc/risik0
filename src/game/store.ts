@@ -3,7 +3,7 @@ import { GameState, Phase, Player, TerritoryState, RiskCard, CardType, Mission, 
 import { TERRITORIES, CONTINENTS, TERRITORY_MAP } from './mapData';
 import { aiReinforce, aiDecideAttacks, aiFortify } from './ai';
 import { assignMissions } from './missions';
-import { evaluateWinner } from './gameEngine';
+import { evaluateWinner, getTerritoryCardBonus } from './gameEngine';
 
 function rollDie(): number {
   return Math.floor(Math.random() * 6) + 1;
@@ -208,10 +208,12 @@ export const useGameStore = create<GameStore>((set, get) => ({
   tradeInCards: (cardIds: string[]) => {
     const s = get();
     const player = s.players[s.currentPlayerIndex];
+    if (cardIds.length !== 3 || new Set(cardIds).size !== 3) return;
     const cards = cardIds.map(id => player.cards.find(c => c.id === id)).filter(Boolean) as RiskCard[];
     if (!isValidSet(cards)) return;
 
-    const bonus = getTradeInValue(s.tradeInCount);
+    const bonus = getTradeInValue(s.tradeInCount) +
+      getTerritoryCardBonus(cards, s.currentPlayerIndex, s.territories);
     const newPlayers = [...s.players];
     newPlayers[s.currentPlayerIndex] = {
       ...player,
@@ -255,9 +257,16 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   executeAttack: (attackDice: number, defendDice: number) => {
     const s = get();
-    if (!s.attackSource || !s.attackTarget) return;
+    if (s.phase !== 'ATTACK' || s.awaitingMoveIn || !s.attackSource || !s.attackTarget) return;
     const sourceState = s.territories[s.attackSource];
     const targetState = s.territories[s.attackTarget];
+    if (
+      !sourceState || !targetState ||
+      sourceState.ownerId !== s.currentPlayerIndex ||
+      targetState.ownerId === s.currentPlayerIndex ||
+      sourceState.armies < 2 ||
+      !TERRITORY_MAP.get(s.attackSource)?.adjacent.includes(s.attackTarget)
+    ) return;
 
     const maxAttack = Math.min(3, sourceState.armies - 1);
     const maxDefend = Math.min(2, targetState.armies);
@@ -505,7 +514,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
     let attacksThisTurn = 0;
     const MAX_ATTACKS = 20;
     while (attacksThisTurn < MAX_ATTACKS && stillMyTurn()) {
-      const freshAttacks = aiDecideAttacks(playerIndex, get().territories);
+      const freshAttacks = aiDecideAttacks(
+        playerIndex,
+        get().territories,
+        get().useMissions ? get().missions[playerIndex] : undefined
+      );
       if (freshAttacks.length === 0) break;
 
       const attack = freshAttacks[0];

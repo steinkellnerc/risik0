@@ -6,10 +6,10 @@
 
 import { supabase } from './supabase';
 import { TERRITORIES } from '../game/mapData';
-import { PLAYER_NAMES, PLAYER_COLORS, type RiskCard, type CardType } from '../game/types';
+import { PLAYER_NAMES, PLAYER_COLORS, type Mission, type RiskCard, type CardType } from '../game/types';
 import { shuffleArray, distributeTerritories, calculateReinforcements } from '../game/gameEngine';
-import { assignMissions } from '../game/missions';
 import type { RealtimeChannel } from '@supabase/supabase-js';
+import type { Json } from './database.types';
 
 // ==================== TYPES ====================
 
@@ -66,7 +66,7 @@ export async function createGame(
       use_missions: useMissions,
       host_user_id: hostUserId,
     })
-    .select()
+    .select('id')
     .single();
 
   if (gameError || !game) throw new Error(gameError?.message || 'Failed to create game');
@@ -197,14 +197,8 @@ export async function startGame(gameId: string, useMissions: boolean): Promise<v
 
   // 4. Assign missions if enabled
   if (useMissions) {
-    const missions = assignMissions(6);
-    for (const [slotIdx, mission] of Object.entries(missions)) {
-      await supabase
-        .from('players')
-        .update({ secret_objective: mission.description })
-        .eq('game_id', gameId)
-        .eq('slot_index', Number(slotIdx));
-    }
+    const { error: missionError } = await supabase.rpc('deal_game_missions', { p_game_id: gameId });
+    if (missionError) throw new Error(missionError.message);
   }
 
   // 5. Calculate initial reinforcements for player 0
@@ -235,20 +229,76 @@ export async function startGame(gameId: string, useMissions: boolean): Promise<v
 
 export async function fetchGameState(gameId: string) {
   const [gameRes, playersRes, territoriesRes, logRes] = await Promise.all([
-    supabase.from('games').select('*').eq('id', gameId).single(),
-    supabase.from('players').select('*').eq('game_id', gameId).order('slot_index'),
-    supabase.from('territories').select('*').eq('game_id', gameId),
-    supabase.from('game_log').select('*').eq('game_id', gameId).order('created_at', { ascending: false }).limit(100),
+    supabase.from('games')
+      .select('id,status,current_player_index,turn_phase,turn_number,trade_in_count,has_conquered_this_turn,use_missions,winner_id,winner_slot_index,host_user_id,last_move_at')
+      .eq('id', gameId)
+      .single(),
+    supabase.from('players')
+      .select('id,game_id,user_id,slot_index,display_name,color,armies_to_place,is_ai,eliminated,cards')
+      .eq('game_id', gameId)
+      .order('slot_index'),
+    supabase.from('territories')
+      .select('id,game_id,territory_id,owner_slot_index,army_count')
+      .eq('game_id', gameId),
+    supabase.from('game_log')
+      .select('id,game_id,created_at,player_slot_index,message,action_type')
+      .eq('game_id', gameId)
+      .order('created_at', { ascending: false })
+      .limit(100),
   ]);
 
   if (gameRes.error) throw new Error(gameRes.error.message);
+  if (!gameRes.data) throw new Error('Game not found');
+  if (playersRes.error) throw new Error(playersRes.error.message);
+  if (territoriesRes.error) throw new Error(territoriesRes.error.message);
+  if (logRes.error) throw new Error(logRes.error.message);
+
+  const missions = gameRes.data.use_missions ? await getGameMissions(gameId) : {};
 
   return {
     game: gameRes.data,
     players: playersRes.data ?? [],
     territories: territoriesRes.data ?? [],
     log: logRes.data ?? [],
+    missions,
   };
+}
+
+function isMission(value: Json): value is Json & Mission {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
+  if (
+    typeof value.id !== 'string' ||
+    typeof value.description !== 'string' ||
+    !['conquer_continents', 'conquer_territories', 'destroy_player'].includes(value.type as string)
+  ) return false;
+  if (value.continents !== undefined && (!Array.isArray(value.continents) || !value.continents.every(c => typeof c === 'string'))) return false;
+  if (value.territoryCount !== undefined && typeof value.territoryCount !== 'number') return false;
+  if (value.minArmiesPerTerritory !== undefined && typeof value.minArmiesPerTerritory !== 'number') return false;
+  if (value.targetPlayerIndex !== undefined && typeof value.targetPlayerIndex !== 'number') return false;
+  return true;
+}
+
+export async function getGameMissions(gameId: string): Promise<Record<number, Mission>> {
+  const { data, error } = await supabase.rpc('get_game_missions', { p_game_id: gameId });
+  if (error) throw new Error(error.message);
+
+  const missions: Record<number, Mission> = {};
+  for (const row of data ?? []) {
+    if (!Number.isInteger(row.slot_index) || !isMission(row.mission)) {
+      throw new Error('Supabase returned an invalid game mission');
+    }
+    missions[row.slot_index] = row.mission;
+  }
+  return missions;
+}
+
+export async function getDestroyMissionWinner(gameId: string, targetSlot: number): Promise<number | null> {
+  const { data, error } = await supabase.rpc('get_destroy_mission_winner', {
+    p_game_id: gameId,
+    p_target_slot: targetSlot,
+  });
+  if (error) throw new Error(error.message);
+  return data;
 }
 
 // ==================== DB UPDATE HELPERS ====================
@@ -419,43 +469,56 @@ export async function listOpenGames(currentUserId?: string): Promise<Array<{
 
 // ==================== GRANT CARD ====================
 
-export async function grantCard(gameId: string, playerSlotIndex: number): Promise<{ id: string; type: string; territoryId: string | null } | null> {
+export async function grantCard(gameId: string, playerSlotIndex: number): Promise<RiskCard | null> {
   // Look up the player's UUID id from their slot index
-  const { data: player } = await supabase
+  const { data: player, error: playerError } = await supabase
     .from('players')
     .select('id')
     .eq('game_id', gameId)
     .eq('slot_index', playerSlotIndex)
     .single();
 
+  if (playerError) throw new Error(playerError.message);
   if (!player) return null;
 
   // Find an unowned card in the deck
-  const { data: card } = await supabase
+  const { data: card, error: cardError } = await supabase
     .from('risk_cards')
     .select('id, card_type, territory_name')
     .eq('game_id', gameId)
     .is('player_id', null)
     .limit(1)
-    .single();
+    .maybeSingle();
 
+  if (cardError) throw new Error(cardError.message);
   if (!card) return null;
 
-  // Assign the card to the player
-  await supabase
+  // Claim the card only if it is still in the deck.
+  const { data: claimedCard, error: claimError } = await supabase
     .from('risk_cards')
     .update({ player_id: player.id })
-    .eq('id', card.id);
+    .eq('id', card.id)
+    .is('player_id', null)
+    .select('id')
+    .maybeSingle();
 
-  return { id: card.id as string, type: card.card_type as string, territoryId: card.territory_name as string | null };
+  if (claimError) throw new Error(claimError.message);
+  if (!claimedCard) return null;
+
+  return {
+    id: card.id,
+    type: card.card_type as CardType,
+    territoryId: card.territory_name,
+  };
 }
 
 export async function returnCards(cardIds: string[]): Promise<void> {
   if (!cardIds.length) return;
-  await supabase
+  const { error } = await supabase
     .from('risk_cards')
     .update({ player_id: null })
     .in('id', cardIds);
+  if (error) throw new Error(error.message);
 }
 
 // ==================== LIST ACTIVE GAMES FOR USER ====================

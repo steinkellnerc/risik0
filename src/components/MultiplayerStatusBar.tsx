@@ -11,7 +11,7 @@ const PLAYER_BG = [
 export default function MultiplayerStatusBar() {
   const {
     currentPlayerIndex, phase, turnNumber, players, territories,
-    reinforcementsLeft, winnerId, isMyTurn, mySlotIndex, disconnect, useMissions,
+    reinforcementsLeft, winnerId, winnerSlotIndex, isMyTurn, mySlotIndex, disconnect, useMissions,
   } = useMultiplayerStore();
 
   const myMission = useMissions
@@ -33,8 +33,11 @@ export default function MultiplayerStatusBar() {
     navigate('/lobby');
   };
 
-  if (winnerId) {
-    const winner = players.find(p => p.userId === winnerId || p.id === winnerId);
+  if (winnerId || winnerSlotIndex !== null) {
+    const winner = winnerSlotIndex !== null
+      ? players.find(p => p.slotIndex === winnerSlotIndex)
+      : players.find(p => p.userId === winnerId || p.id === winnerId);
+    const resolvedWinnerSlot = winnerSlotIndex ?? winner?.slotIndex;
     const standings = [...players].sort((a, b) => playerTerritories(b.slotIndex) - playerTerritories(a.slotIndex));
 
     return (
@@ -98,7 +101,7 @@ export default function MultiplayerStatusBar() {
                 <div className="bg-muted/40 rounded-lg p-3 space-y-1.5">
                   <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Final standings</span>
                   {standings.map((p, idx) => {
-                    const isWinner = p.userId === winnerId || p.id === winnerId;
+                    const isWinner = p.slotIndex === resolvedWinnerSlot || p.userId === winnerId || p.id === winnerId;
                     return (
                       <div key={p.slotIndex} className="flex items-center gap-2 text-xs font-mono-tabular">
                         <span className="w-3 text-muted-foreground">{idx + 1}</span>
@@ -119,7 +122,7 @@ export default function MultiplayerStatusBar() {
                   <div className="bg-muted/40 rounded-lg p-3 space-y-1.5">
                     <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">All missions revealed</span>
                     {players.map(p => {
-                      const isWinner = p.userId === winnerId || p.id === winnerId;
+                      const isWinner = p.slotIndex === resolvedWinnerSlot || p.userId === winnerId || p.id === winnerId;
                       return (
                         <div key={p.slotIndex} className="flex items-start gap-2 text-xs">
                           <div className={`w-2 h-2 rounded-full mt-1 shrink-0 ${PLAYER_BG[p.slotIndex]}`} />

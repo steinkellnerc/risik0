@@ -10,11 +10,13 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setNotice('');
     setLoading(true);
 
     try {
@@ -29,7 +31,13 @@ export default function LoginPage() {
         }
         const { error } = await signUp(email, password, displayName);
         if (error) setError(error.message);
+        else {
+          setNotice('Account created. Check your email if confirmation is required.');
+          setPassword('');
+        }
       }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to sign in right now.');
     } finally {
       setLoading(false);
     }
@@ -45,7 +53,7 @@ export default function LoginPage() {
         <div className="text-center space-y-2">
           <h1 className="text-4xl font-bold text-foreground tracking-tight">RISK</h1>
           <p className="text-muted-foreground text-sm">
-            Sign in to conquer the world
+            Play online with friends
           </p>
         </div>
 
@@ -53,7 +61,9 @@ export default function LoginPage() {
         <div className="bg-surface rounded-xl p-5 space-y-4 shadow-elevated">
           <div className="flex gap-2">
             <button
+              type="button"
               onClick={() => setMode('login')}
+              aria-pressed={mode === 'login'}
               className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-all ${
                 mode === 'login'
                   ? 'bg-primary text-primary-foreground shadow-glow'
@@ -63,7 +73,9 @@ export default function LoginPage() {
               <LogIn size={14} className="inline mr-1" /> Sign In
             </button>
             <button
+              type="button"
               onClick={() => setMode('register')}
+              aria-pressed={mode === 'register'}
               className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-all ${
                 mode === 'register'
                   ? 'bg-primary text-primary-foreground shadow-glow'
@@ -79,16 +91,21 @@ export default function LoginPage() {
               <input
                 type="text"
                 placeholder="Display Name"
+                aria-label="Display name"
                 value={displayName}
                 onChange={e => setDisplayName(e.target.value)}
+                autoComplete="nickname"
+                required
                 className="w-full px-3 py-2 rounded-lg bg-muted text-foreground text-sm placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-2 focus:ring-primary"
               />
             )}
             <input
               type="email"
               placeholder="Email"
+              aria-label="Email"
               value={email}
               onChange={e => setEmail(e.target.value)}
+              autoComplete="email"
               className="w-full px-3 py-2 rounded-lg bg-muted text-foreground text-sm placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-2 focus:ring-primary"
               required
             />
@@ -96,8 +113,10 @@ export default function LoginPage() {
               <input
                 type="password"
                 placeholder="Password"
+                aria-label="Password"
                 value={password}
                 onChange={e => setPassword(e.target.value)}
+                autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
                 className="w-full px-3 py-2 rounded-lg bg-muted text-foreground text-sm placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-2 focus:ring-primary"
                 required
                 minLength={6}
@@ -119,6 +138,11 @@ export default function LoginPage() {
         {error && (
           <div className="text-destructive text-sm text-center bg-destructive/10 rounded-lg px-3 py-2">
             {error}
+          </div>
+        )}
+        {notice && (
+          <div role="status" className="text-primary text-sm text-center bg-primary/10 rounded-lg px-3 py-2">
+            {notice}
           </div>
         )}
       </motion.div>

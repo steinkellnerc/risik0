@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import { createGame, listOpenGames, listMyActiveGames, joinGame, cancelGame, getLeaderboard, type LeaderboardEntry } from '../lib/multiplayerSync';
-import { LogOut, Plus, Users, RefreshCw, Gamepad2, Target, Crown, Trash2, Trophy, Sparkles } from 'lucide-react';
+import { LogOut, Plus, Users, RefreshCw, Target, Crown, Trash2, Trophy, Sparkles } from 'lucide-react';
 
 type GameEntry = {
   id: string;
@@ -27,28 +27,54 @@ export default function LobbyPage() {
 
   const displayName = user?.user_metadata?.display_name || user?.email?.split('@')[0] || 'Player';
 
-  const refreshGames = async () => {
+  const refreshGames = useCallback(async () => {
     setLoading(true);
     try {
-      const [open, active, board] = await Promise.all([
+      const [open, active] = await Promise.all([
         listOpenGames(user?.id),
         user?.id ? listMyActiveGames(user.id) : Promise.resolve([]),
-        getLeaderboard(20),
       ]);
       setGames(open);
       setActiveGames(active);
-      setLeaderboard(board);
-    } catch {
-      // ignore
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not refresh games.');
     } finally {
       setLoading(false);
     }
-  };
+  }, [user?.id]);
 
   useEffect(() => {
-    refreshGames();
-    const interval = setInterval(refreshGames, 10000);
-    return () => clearInterval(interval);
+    let refreshing = false;
+    const refreshVisibleGames = async () => {
+      if (refreshing || document.hidden) return;
+      refreshing = true;
+      try {
+        await refreshGames();
+      } finally {
+        refreshing = false;
+      }
+    };
+    const handleVisibilityChange = () => {
+      if (!document.hidden) void refreshVisibleGames();
+    };
+
+    void refreshVisibleGames();
+    const interval = setInterval(refreshVisibleGames, 15000);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [refreshGames]);
+
+  useEffect(() => {
+    let mounted = true;
+    getLeaderboard(20)
+      .then(board => { if (mounted) setLeaderboard(board); })
+      .catch(err => {
+        if (mounted) setError(err instanceof Error ? err.message : 'Could not load leaderboard.');
+      });
+    return () => { mounted = false; };
   }, []);
 
   const handleCreateGame = async () => {
@@ -258,11 +284,6 @@ export default function LobbyPage() {
               ))
             )}
           </div>
-
-          {/* Local game */}
-          <button type="button" onClick={() => navigate('/local')} className="w-full flex items-center justify-center gap-2 px-4 py-2.5 border border-border text-muted-foreground rounded-xl text-sm hover:bg-secondary transition-colors">
-            <Gamepad2 size={16} /> Play Local (Single Device)
-          </button>
 
           {/* Leaderboard */}
           <div className="bg-surface rounded-xl p-4 space-y-3 shadow-elevated">

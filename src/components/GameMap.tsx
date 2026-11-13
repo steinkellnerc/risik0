@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion';
 import { useRef, useState, useEffect, useCallback } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { useGameStore } from '../game/store';
 import { useMultiplayerStore } from '../game/multiplayerStore';
 import { TERRITORIES, TERRITORY_MAP, CONTINENT_COLORS, CONTINENTS } from '../game/mapData';
@@ -214,8 +215,38 @@ export default function GameMap({ multiplayer = false }: { multiplayer?: boolean
   const activeR = isMobile ? 24 : 20;
   const potentialR = isMobile ? 23 : 19;
   // Use the appropriate store based on mode
-  const localStore = useGameStore();
-  const mpStore = useMultiplayerStore();
+  const localStore = useGameStore(useShallow(s => ({
+    territories: s.territories,
+    phase: s.phase,
+    currentPlayerIndex: s.currentPlayerIndex,
+    attackSource: s.attackSource,
+    attackTarget: s.attackTarget,
+    fortifySource: s.fortifySource,
+    awaitingMoveIn: s.awaitingMoveIn,
+    winner: s.winner,
+    placeReinforcement: s.placeReinforcement,
+    selectAttackSource: s.selectAttackSource,
+    selectAttackTarget: s.selectAttackTarget,
+    selectFortifySource: s.selectFortifySource,
+    selectFortifyTarget: s.selectFortifyTarget,
+  })));
+  const mpStore = useMultiplayerStore(useShallow(s => ({
+    territories: s.territories,
+    phase: s.phase,
+    currentPlayerIndex: s.currentPlayerIndex,
+    attackSource: s.attackSource,
+    attackTarget: s.attackTarget,
+    fortifySource: s.fortifySource,
+    awaitingMoveIn: s.awaitingMoveIn,
+    winnerId: s.winnerId,
+    winnerSlotIndex: s.winnerSlotIndex,
+    isMyTurn: s.isMyTurn,
+    placeReinforcement: s.placeReinforcement,
+    selectAttackSource: s.selectAttackSource,
+    selectAttackTarget: s.selectAttackTarget,
+    selectFortifySource: s.selectFortifySource,
+    selectFortifyTarget: s.selectFortifyTarget,
+  })));
 
   const territories = multiplayer ? mpStore.territories : localStore.territories;
   const phase = multiplayer ? mpStore.phase : localStore.phase;
@@ -231,11 +262,14 @@ export default function GameMap({ multiplayer = false }: { multiplayer?: boolean
   const selectFortifyTarget = multiplayer ? mpStore.selectFortifyTarget : localStore.selectFortifyTarget;
 
   // Block interaction once the game is over; in multiplayer also block when not my turn
-  const gameOver = multiplayer ? !!mpStore.winnerId : localStore.winner !== null;
+  const gameOver = multiplayer
+    ? !!mpStore.winnerId || mpStore.winnerSlotIndex !== null
+    : localStore.winner !== null;
   const isReadOnly = gameOver || (multiplayer && !mpStore.isMyTurn);
+  const awaitingMoveIn = multiplayer ? mpStore.awaitingMoveIn : localStore.awaitingMoveIn;
 
   const handleTerritoryClick = (tid: string) => {
-    if (isReadOnly) return;
+    if (isReadOnly || awaitingMoveIn) return;
     const tState = territories[tid];
     if (!tState) return;
 
@@ -396,7 +430,7 @@ export default function GameMap({ multiplayer = false }: { multiplayer?: boolean
               const isOwned = state.ownerId === currentPlayerIndex;
               const isPotentialSource = phase === 'ATTACK' && !attackSource && !!attackTarget &&
                 isOwned && state.armies >= 2 && t.adjacent.includes(attackTarget);
-              const canInteract = isReadOnly ? false :
+              const canInteract = isReadOnly || awaitingMoveIn ? false :
                 phase === 'REINFORCE' ? isOwned :
                 phase === 'ATTACK' ? true :
                 phase === 'FORTIFY' ? isOwned : false;
@@ -480,7 +514,7 @@ export default function GameMap({ multiplayer = false }: { multiplayer?: boolean
               const isOwned = state.ownerId === currentPlayerIndex;
               const isPotentialSource = phase === 'ATTACK' && !attackSource && !!attackTarget &&
                 isOwned && state.armies >= 2 && t.adjacent.includes(attackTarget);
-              const canInteract = isReadOnly ? false :
+              const canInteract = isReadOnly || awaitingMoveIn ? false :
                 phase === 'REINFORCE' ? isOwned :
                 phase === 'ATTACK' ? true :
                 phase === 'FORTIFY' ? isOwned : false;

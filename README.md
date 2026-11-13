@@ -1,6 +1,6 @@
 # risik0
 
-A web-based implementation of the classic Risk strategy board game. Play locally against AI opponents or create multiplayer matches with friends in real time.
+A web-based implementation of the classic Risk strategy board game. Create online matches with friends in real time, with optional AI opponents.
 
 ![React](https://img.shields.io/badge/React-18.3-blue)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.8-blue)
@@ -9,7 +9,6 @@ A web-based implementation of the classic Risk strategy board game. Play locally
 
 ## Features
 
-- **Local Play** — 1–6 human players with AI filling remaining slots
 - **Online Multiplayer** — Real-time games via Supabase Realtime subscriptions
 - **Classic Rules** — Reinforce → Attack → Fortify phase cycle, dice combat, card trading with escalating values
 - **Secret Missions** — Optional alternate win conditions (e.g. "Control North America & Africa")
@@ -47,7 +46,7 @@ VITE_SUPABASE_ANON_KEY=<anon-key>
 
 ### Database Setup
 
-Apply the schema from [`supabase/schema.sql`](supabase/schema.sql) to your Supabase project. It creates tables for games, players, territories, cards, and a game log, along with Row-Level Security policies.
+Apply the schema from [`supabase/schema.sql`](supabase/schema.sql) to your Supabase project. It creates the game tables and Row-Level Security policies, and uses server-side functions to assign and selectively reveal Secret Missions. When upgrading an existing deployment, re-run the schema before deploying the client: it migrates saved mission descriptions, removes the publicly readable mission column, and adds the private mission table and functions.
 
 ### Install & Run
 
@@ -68,7 +67,7 @@ npm run test:watch # run Vitest in watch mode
 
 ## How It Works
 
-1. **Setup** — Territories are distributed among players and initial armies placed.
+1. **Lobby** — Create or join a game, choose World Domination or Secret Missions, and invite friends. Hosts can choose human slots; remaining slots are filled by AI.
 2. **Reinforce** — Receive armies based on territory count + continent bonuses. Optionally trade card sets for extra armies.
 3. **Attack** — Target adjacent enemy territories. Attacker rolls up to 3 dice, defender up to 2. Ties favor the defender.
 4. **Fortify** — Move armies between connected friendly territories.
